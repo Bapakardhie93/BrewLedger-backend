@@ -37,6 +37,8 @@ public class SecurityConfig {
             HttpSecurity http
     ) throws Exception {
 
+        System.out.println("SECURITY CONFIG LOADED");
+
         http
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session ->

@@ -34,7 +34,7 @@ public class User extends BaseEntity {
 
     private LocalDateTime lastLogin;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "role_id", nullable = false)
     private Role role;
 }
