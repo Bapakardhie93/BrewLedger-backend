@@ -1,0 +1,8 @@
+package com.brewledger.brewledger.backend.repository;
+
+import com.brewledger.brewledger.backend.entity.ProductRecipe;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface ProductRecipeRepository
+        extends JpaRepository<ProductRecipe, Long> {
+}
