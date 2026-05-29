@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.time.LocalDateTime;
+
 @Getter
 @Setter
 @Entity
@@ -11,22 +13,22 @@ import lombok.Setter;
 public class StockMovement extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "ingredient_id", nullable = false)
+    @JoinColumn(name = "ingredient_id")
     private Ingredient ingredient;
-
-    @Column(nullable = false)
-    private String movementType;
 
     @Column(nullable = false)
     private Double quantity;
 
-    private String referenceType;
+    @Column(nullable = false)
+    private Double stockBefore;
 
-    private Long referenceId;
+    @Column(nullable = false)
+    private Double stockAfter;
 
-    private String notes;
+    @Column(nullable = false)
+    private String movementType;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "created_by")
-    private User createdBy;
+    private String referenceNumber;
+
+    private LocalDateTime movementDate;
 }

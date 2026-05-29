@@ -19,9 +19,13 @@ public class PurchaseOrder extends BaseEntity {
     @JoinColumn(name = "supplier_id", nullable = false)
     private Supplier supplier;
 
+    @Column(nullable = false)
     private LocalDate orderDate;
 
+    @Column(nullable = false)
     private String status;
+
+    private String notes;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by")

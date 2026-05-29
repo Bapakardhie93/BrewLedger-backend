@@ -10,6 +10,7 @@ import lombok.Setter;
 @Table(name = "purchase_order_items")
 public class PurchaseOrderItem extends BaseEntity {
 
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "purchase_order_id", nullable = false)
     private PurchaseOrder purchaseOrder;
@@ -22,8 +23,12 @@ public class PurchaseOrderItem extends BaseEntity {
     private Double quantity;
 
     @Column(nullable = false)
-    private Double price;
+    private Double unitPrice;
 
     @Column(nullable = false)
     private Double subtotal;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private PurchaseOrderStatus status;
 }

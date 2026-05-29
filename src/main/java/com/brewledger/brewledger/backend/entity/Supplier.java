@@ -15,6 +15,8 @@ public class Supplier extends BaseEntity {
     @Column(nullable = false)
     private String name;
 
+    private String contactPerson;
+
     private String phone;
 
     private String email;
