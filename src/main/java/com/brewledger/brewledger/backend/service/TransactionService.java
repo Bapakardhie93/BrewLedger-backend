@@ -227,4 +227,21 @@ public class TransactionService {
                 itemResponses
         );
     }
+
+    public List<TransactionResponse> findAll() {
+
+        return transactionRepository.findAll()
+                .stream()
+                .map(transaction ->
+                        new TransactionResponse(
+                                transaction.getId(),
+                                transaction.getTransactionNumber(),
+                                transaction.getSubtotal(),
+                                transaction.getTax(),
+                                transaction.getTotal(),
+                                List.of()
+                        )
+                )
+                .toList();
+    }
 }

@@ -14,6 +14,16 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ProductController {
 
+    @GetMapping("/search")
+    public List<ProductResponse> search(
+            @RequestParam String keyword
+    ) {
+
+        return service.search(
+                keyword
+        );
+    }
+
     private final ProductService service;
 
     @PostMapping

@@ -3,6 +3,7 @@ package com.brewledger.brewledger.backend.repository;
 import com.brewledger.brewledger.backend.entity.Product;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface ProductRepository
@@ -11,4 +12,8 @@ public interface ProductRepository
     Optional<Product> findByCode(String code);
 
     boolean existsByCode(String code);
+
+    List<Product> findByNameContainingIgnoreCase(
+            String keyword
+    );
 }

@@ -6,6 +6,7 @@ import com.brewledger.brewledger.backend.service.TransactionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/transactions")
@@ -20,5 +21,11 @@ public class TransactionController {
             @RequestBody CreateTransactionRequest request
     ) {
         return service.create(request);
+    }
+
+    @GetMapping
+    public List<TransactionResponse> findAll() {
+
+        return service.findAll();
     }
 }

@@ -82,4 +82,28 @@ public class ProductService {
                 )
                 .toList();
     }
+
+    public List<ProductResponse> search(
+            String keyword
+    ) {
+
+        return productRepository
+                .findByNameContainingIgnoreCase(
+                        keyword
+                )
+                .stream()
+                .map(product ->
+                        new ProductResponse(
+                                product.getId(),
+                                product.getCode(),
+                                product.getName(),
+                                product.getCategory()
+                                        .getName(),
+                                product.getSellingPrice(),
+                                product.getDescription(),
+                                product.getActive()
+                        )
+                )
+                .toList();
+    }
 }

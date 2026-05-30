@@ -7,6 +7,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import com.brewledger.brewledger.backend.dto.ingredient.LowStockResponse;
+
 import java.util.List;
 
 @RestController
@@ -16,6 +18,8 @@ public class IngredientController {
 
     private final IngredientService service;
 
+
+
     @PostMapping
     public IngredientResponse create(
             @Valid
@@ -23,9 +27,24 @@ public class IngredientController {
     ) {
         return service.create(request);
     }
+    @GetMapping("/low-stock")
+    public List<LowStockResponse> getLowStock() {
+
+        return service.getLowStock();
+    }
 
     @GetMapping
     public List<IngredientResponse> findAll() {
         return service.findAll();
+    }
+
+    @GetMapping("/search")
+    public List<IngredientResponse> search(
+            @RequestParam String keyword
+    ) {
+
+        return service.search(
+                keyword
+        );
     }
 }

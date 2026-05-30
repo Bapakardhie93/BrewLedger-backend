@@ -8,6 +8,7 @@ import com.brewledger.brewledger.backend.repository.IngredientRepository;
 import com.brewledger.brewledger.backend.repository.SupplierRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import com.brewledger.brewledger.backend.dto.ingredient.LowStockResponse;
 
 import java.util.List;
 
@@ -17,6 +18,23 @@ public class IngredientService {
 
     private final IngredientRepository ingredientRepository;
     private final SupplierRepository supplierRepository;
+
+    public List<LowStockResponse> getLowStock() {
+
+        return ingredientRepository
+                .findLowStock()
+                .stream()
+                .map(ingredient ->
+                        new LowStockResponse(
+                                ingredient.getId(),
+                                ingredient.getCode(),
+                                ingredient.getName(),
+                                ingredient.getCurrentStock(),
+                                ingredient.getMinimumStock()
+                        )
+                )
+                .toList();
+    }
 
     public IngredientResponse create(
             CreateIngredientRequest request
@@ -98,6 +116,31 @@ public class IngredientService {
                                 ingredient.getName(),
                                 ingredient.getSupplier()
                                         .getName(),
+                                ingredient.getUnit(),
+                                ingredient.getCurrentStock(),
+                                ingredient.getMinimumStock(),
+                                ingredient.getCostPrice(),
+                                ingredient.getActive()
+                        )
+                )
+                .toList();
+    }
+
+    public List<IngredientResponse> search(
+            String keyword
+    ) {
+
+        return ingredientRepository
+                .findByNameContainingIgnoreCase(
+                        keyword
+                )
+                .stream()
+                .map(ingredient ->
+                        new IngredientResponse(
+                                ingredient.getId(),
+                                ingredient.getCode(),
+                                ingredient.getName(),
+                                ingredient.getSupplier().getName(),
                                 ingredient.getUnit(),
                                 ingredient.getCurrentStock(),
                                 ingredient.getMinimumStock(),
