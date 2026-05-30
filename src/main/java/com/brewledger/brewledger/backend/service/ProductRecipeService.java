@@ -5,11 +5,14 @@ import com.brewledger.brewledger.backend.dto.recipe.ProductRecipeResponse;
 import com.brewledger.brewledger.backend.entity.Ingredient;
 import com.brewledger.brewledger.backend.entity.Product;
 import com.brewledger.brewledger.backend.entity.ProductRecipe;
+import com.brewledger.brewledger.backend.exception.BusinessException;
+import com.brewledger.brewledger.backend.exception.ResourceNotFoundException;
 import com.brewledger.brewledger.backend.repository.IngredientRepository;
 import com.brewledger.brewledger.backend.repository.ProductRecipeRepository;
 import com.brewledger.brewledger.backend.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -21,52 +24,39 @@ public class ProductRecipeService {
     private final ProductRepository productRepository;
     private final IngredientRepository ingredientRepository;
 
-    public ProductRecipeResponse create(
-            CreateProductRecipeRequest request
-    ) {
+    @Transactional
+    public ProductRecipeResponse create(CreateProductRecipeRequest request) {
 
-        Product product =
-                productRepository.findById(
-                        request.getProductId()
-                ).orElseThrow(() ->
-                        new RuntimeException(
-                                "Produk tidak ditemukan"
-                        ));
+        Product product = productRepository.findById(request.getProductId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Produk tidak ditemukan dengan ID: " + request.getProductId()
+                ));
 
-        Ingredient ingredient =
-                ingredientRepository.findById(
-                        request.getIngredientId()
-                ).orElseThrow(() ->
-                        new RuntimeException(
-                                "Ingredient tidak ditemukan"
-                        ));
+        Ingredient ingredient = ingredientRepository.findById(request.getIngredientId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Ingredient tidak ditemukan dengan ID: " + request.getIngredientId()
+                ));
 
-        boolean exists =
-                recipeRepository.existsByProductAndIngredient(
-                        product,
-                        ingredient
-                );
+        boolean exists = recipeRepository.existsByProductAndIngredient(product, ingredient);
 
         if (exists) {
-            throw new RuntimeException(
-                    "Recipe sudah terdaftar"
+            throw new BusinessException(
+                    "Recipe untuk produk '" + product.getName()
+                            + "' dengan ingredient '" + ingredient.getName() + "' sudah terdaftar"
             );
         }
 
-        ProductRecipe recipe =
-                new ProductRecipe();
-
+        ProductRecipe recipe = new ProductRecipe();
         recipe.setProduct(product);
         recipe.setIngredient(ingredient);
-        recipe.setQuantityRequired(
-                request.getQuantityRequired()
-        );
+        recipe.setQuantityRequired(request.getQuantityRequired());
 
         recipeRepository.save(recipe);
 
         return mapToResponse(recipe);
     }
 
+    @Transactional(readOnly = true)
     public List<ProductRecipeResponse> findAll() {
 
         return recipeRepository.findAll()
@@ -75,9 +65,8 @@ public class ProductRecipeService {
                 .toList();
     }
 
-    public List<ProductRecipeResponse> findByProduct(
-            Long productId
-    ) {
+    @Transactional(readOnly = true)
+    public List<ProductRecipeResponse> findByProduct(Long productId) {
 
         return recipeRepository
                 .findByProductId(productId)
@@ -86,9 +75,7 @@ public class ProductRecipeService {
                 .toList();
     }
 
-    private ProductRecipeResponse mapToResponse(
-            ProductRecipe recipe
-    ) {
+    private ProductRecipeResponse mapToResponse(ProductRecipe recipe) {
 
         return new ProductRecipeResponse(
                 recipe.getId(),

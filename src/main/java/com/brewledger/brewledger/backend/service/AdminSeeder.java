@@ -4,11 +4,13 @@ import com.brewledger.brewledger.backend.entity.Role;
 import com.brewledger.brewledger.backend.entity.User;
 import com.brewledger.brewledger.backend.repository.RoleRepository;
 import com.brewledger.brewledger.backend.repository.UserRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+@Slf4j
 @Component
 public class AdminSeeder implements CommandLineRunner {
 
@@ -60,9 +62,6 @@ public class AdminSeeder implements CommandLineRunner {
 
         userRepository.save(admin);
 
-        System.out.println(
-                "Admin default berhasil dibuat: "
-                        + adminUsername
-        );
+        log.info("Default admin created with username: {}", adminUsername);
     }
 }

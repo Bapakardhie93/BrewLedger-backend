@@ -3,14 +3,17 @@ package com.brewledger.brewledger.backend.service;
 import com.brewledger.brewledger.backend.dto.auth.LoginRequest;
 import com.brewledger.brewledger.backend.dto.auth.LoginResponse;
 import com.brewledger.brewledger.backend.entity.User;
+import com.brewledger.brewledger.backend.exception.AuthException;
 import com.brewledger.brewledger.backend.repository.UserRepository;
 import com.brewledger.brewledger.backend.security.JwtService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -19,14 +22,21 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
 
+    /**
+     * Authenticates a user, updates last login timestamp, and returns a JWT token.
+     *
+     * @param request the login credentials
+     * @return a LoginResponse containing the JWT token, username, and role
+     * @throws AuthException if credentials are invalid or the user is inactive
+     */
     public LoginResponse login(LoginRequest request) {
 
         User user = userRepository.findByUsername(request.getUsername())
-                .orElseThrow(() ->
-                        new RuntimeException("Username atau password salah"));
+                .orElseThrow(() -> new AuthException("Username atau password salah"));
 
         if (!user.getActive()) {
-            throw new RuntimeException("User tidak aktif");
+            log.warn("Login attempt for inactive user: {}", request.getUsername());
+            throw new AuthException("Akun Anda tidak aktif. Silakan hubungi administrator.");
         }
 
         boolean passwordMatch =
@@ -36,14 +46,16 @@ public class AuthService {
                 );
 
         if (!passwordMatch) {
-            throw new RuntimeException("Username atau password salah");
+            log.warn("Failed login attempt for user: {}", request.getUsername());
+            throw new AuthException("Username atau password salah");
         }
 
         user.setLastLogin(LocalDateTime.now());
         userRepository.save(user);
 
-        String token =
-                jwtService.generateToken(user.getUsername());
+        String token = jwtService.generateToken(user.getUsername());
+
+        log.info("User '{}' logged in successfully", user.getUsername());
 
         return new LoginResponse(
                 token,
