@@ -14,7 +14,7 @@ Target Platform:
 - iOS (SwiftUI)
 
 Backend:
-- Java 21
+- Java 25
 - Spring Boot
 - Spring Data JPA
 - PostgreSQL (Supabase)
