@@ -23,7 +23,7 @@ public class RoleSeeder implements CommandLineRunner {
         );
 
         createRoleIfNotExists(
-                "MANAJEMEN",
+                "MANAGEMENT",
                 "Pengelolaan bisnis dan laporan"
         );
 

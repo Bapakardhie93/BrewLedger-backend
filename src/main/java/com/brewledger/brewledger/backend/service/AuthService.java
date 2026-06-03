@@ -53,7 +53,7 @@ public class AuthService {
         user.setLastLogin(LocalDateTime.now());
         userRepository.save(user);
 
-        String token = jwtService.generateToken(user.getUsername());
+        String token = jwtService.generateToken(user.getUsername(), user.getRole().getName());
 
         log.info("User '{}' logged in successfully", user.getUsername());
 
