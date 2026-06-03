@@ -17,6 +17,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public class IngredientService {
 
     private final IngredientRepository ingredientRepository;
@@ -60,7 +61,8 @@ public class IngredientService {
             );
         }
 
-        Supplier supplier = supplierRepository.findById(request.getSupplierId())
+        Long supplierId = java.util.Objects.requireNonNull(request.getSupplierId(), "Supplier ID must not be null");
+        Supplier supplier = supplierRepository.findById(supplierId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Supplier tidak ditemukan dengan ID: " + request.getSupplierId()
                 ));

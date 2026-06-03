@@ -409,6 +409,7 @@ $$\text{costPrice} = \frac{\text{purchasePrice}}{\text{packSize}}$$
 
 ---
 
+
 ## 5. POS Checkout, Shift & History
 
 ### Buka Shift Kasir/Gudang oleh Manajemen

@@ -21,6 +21,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public class UserService {
 
     private final UserRepository userRepository;
@@ -36,7 +37,7 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    public UserResponse getUserById(Long id) {
+    public UserResponse getUserById(@org.springframework.lang.NonNull Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User tidak ditemukan"));
         return mapToResponse(user);
@@ -48,7 +49,8 @@ public class UserService {
             throw new IllegalArgumentException("Username sudah digunakan");
         }
 
-        Role role = roleRepository.findById(request.getRoleId())
+        Long roleId = java.util.Objects.requireNonNull(request.getRoleId(), "Role ID must not be null");
+        Role role = roleRepository.findById(roleId)
                 .orElseThrow(() -> new ResourceNotFoundException("Role tidak ditemukan"));
         validateRoleConstraint(role);
 
@@ -70,7 +72,7 @@ public class UserService {
     }
 
     @Transactional
-    public UserResponse updateUser(Long id, UpdateUserRequest request) {
+    public UserResponse updateUser(@org.springframework.lang.NonNull Long id, UpdateUserRequest request) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User tidak ditemukan"));
 
@@ -78,7 +80,8 @@ public class UserService {
             throw new IllegalArgumentException("Username sudah digunakan");
         }
 
-        Role role = roleRepository.findById(request.getRoleId())
+        Long roleId = java.util.Objects.requireNonNull(request.getRoleId(), "Role ID must not be null");
+        Role role = roleRepository.findById(roleId)
                 .orElseThrow(() -> new ResourceNotFoundException("Role tidak ditemukan"));
         validateRoleConstraint(role);
 
@@ -100,7 +103,7 @@ public class UserService {
     }
 
     @Transactional
-    public void deleteUser(Long id) {
+    public void deleteUser(@org.springframework.lang.NonNull Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User tidak ditemukan"));
         userRepository.delete(user);
@@ -111,7 +114,7 @@ public class UserService {
     }
 
     @Transactional
-    public void activateUser(Long id) {
+    public void activateUser(@org.springframework.lang.NonNull Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User tidak ditemukan"));
         user.setActive(true);
@@ -123,7 +126,7 @@ public class UserService {
     }
 
     @Transactional
-    public void deactivateUser(Long id) {
+    public void deactivateUser(@org.springframework.lang.NonNull Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User tidak ditemukan"));
         user.setActive(false);

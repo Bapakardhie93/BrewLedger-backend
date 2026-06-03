@@ -31,6 +31,7 @@ import java.util.List;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public class PurchaseOrderService {
 
     private final PurchaseOrderItemRepository itemRepository;
@@ -43,7 +44,7 @@ public class PurchaseOrderService {
     private final NotificationService notificationService;
 
     @Transactional(readOnly = true)
-    public List<PurchaseOrderItemResponse> getItems(Long purchaseOrderId) {
+    public List<PurchaseOrderItemResponse> getItems(@org.springframework.lang.NonNull Long purchaseOrderId) {
 
         return itemRepository
                 .findByPurchaseOrderId(purchaseOrderId)
@@ -66,7 +67,7 @@ public class PurchaseOrderService {
      * Bug Fix #4: Use PurchaseOrderStatus enum consistently instead of raw Strings.
      */
     @Transactional
-    public PurchaseOrderResponse receive(Long purchaseOrderId) {
+    public PurchaseOrderResponse receive(@org.springframework.lang.NonNull Long purchaseOrderId) {
 
         PurchaseOrder po = purchaseOrderRepository.findById(purchaseOrderId)
                 .orElseThrow(() -> new ResourceNotFoundException(
@@ -137,7 +138,7 @@ public class PurchaseOrderService {
      */
     @Transactional
     public PurchaseOrderItemResponse addItem(
-            Long purchaseOrderId,
+            @org.springframework.lang.NonNull Long purchaseOrderId,
             CreatePurchaseOrderItemRequest request
     ) {
         PurchaseOrder po = purchaseOrderRepository.findById(purchaseOrderId)
@@ -154,7 +155,8 @@ public class PurchaseOrderService {
             );
         }
 
-        Ingredient ingredient = ingredientRepository.findById(request.getIngredientId())
+        Long ingredientId = java.util.Objects.requireNonNull(request.getIngredientId(), "Ingredient ID must not be null");
+        Ingredient ingredient = ingredientRepository.findById(ingredientId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Ingredient tidak ditemukan dengan ID: " + request.getIngredientId()
                 ));
@@ -181,7 +183,8 @@ public class PurchaseOrderService {
     @Transactional
     public PurchaseOrderResponse create(CreatePurchaseOrderRequest request) {
 
-        Supplier supplier = supplierRepository.findById(request.getSupplierId())
+        Long supplierId = java.util.Objects.requireNonNull(request.getSupplierId(), "Supplier ID must not be null");
+        Supplier supplier = supplierRepository.findById(supplierId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Supplier tidak ditemukan dengan ID: " + request.getSupplierId()
                 ));

@@ -18,6 +18,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public class ProductService {
 
     private final ProductRepository productRepository;
@@ -36,7 +37,8 @@ public class ProductService {
             );
         }
 
-        ProductCategory category = categoryRepository.findById(request.getCategoryId())
+        Long categoryId = java.util.Objects.requireNonNull(request.getCategoryId(), "Category ID must not be null");
+        ProductCategory category = categoryRepository.findById(categoryId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Kategori tidak ditemukan dengan ID: " + request.getCategoryId()
                 ));

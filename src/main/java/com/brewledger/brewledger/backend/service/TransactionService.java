@@ -23,6 +23,7 @@ import java.util.List;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public class TransactionService {
 
     private static final double TAX_RATE = PosService.TAX_RATE;
@@ -120,7 +121,9 @@ public class TransactionService {
 
         for (CreateTransactionItemRequest itemRequest : request.getItems()) {
 
-            Product product = productRepository.findById(itemRequest.getProductId())
+            // Bug Fix #7: Use ResourceNotFoundException for 404
+            Long productId = java.util.Objects.requireNonNull(itemRequest.getProductId(), "Product ID must not be null");
+            Product product = productRepository.findById(productId)
                     .orElseThrow(() -> new ResourceNotFoundException(
                             "Produk tidak ditemukan dengan ID: " + itemRequest.getProductId()
                     ));

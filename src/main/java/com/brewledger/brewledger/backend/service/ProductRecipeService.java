@@ -18,6 +18,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@SuppressWarnings("null")
 public class ProductRecipeService {
 
     private final ProductRecipeRepository recipeRepository;
@@ -27,12 +28,14 @@ public class ProductRecipeService {
     @Transactional
     public ProductRecipeResponse create(CreateProductRecipeRequest request) {
 
-        Product product = productRepository.findById(request.getProductId())
+        Long productId = java.util.Objects.requireNonNull(request.getProductId(), "Product ID must not be null");
+        Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Produk tidak ditemukan dengan ID: " + request.getProductId()
                 ));
 
-        Ingredient ingredient = ingredientRepository.findById(request.getIngredientId())
+        Long ingredientId = java.util.Objects.requireNonNull(request.getIngredientId(), "Ingredient ID must not be null");
+        Ingredient ingredient = ingredientRepository.findById(ingredientId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Ingredient tidak ditemukan dengan ID: " + request.getIngredientId()
                 ));
@@ -66,7 +69,7 @@ public class ProductRecipeService {
     }
 
     @Transactional(readOnly = true)
-    public List<ProductRecipeResponse> findByProduct(Long productId) {
+    public List<ProductRecipeResponse> findByProduct(@org.springframework.lang.NonNull Long productId) {
 
         return recipeRepository
                 .findByProductId(productId)
