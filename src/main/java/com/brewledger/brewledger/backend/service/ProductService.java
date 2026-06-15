@@ -2,6 +2,7 @@ package com.brewledger.brewledger.backend.service;
 
 import com.brewledger.brewledger.backend.dto.product.CreateProductRequest;
 import com.brewledger.brewledger.backend.dto.product.ProductResponse;
+import com.brewledger.brewledger.backend.dto.product.UpdateProductRequest;
 import com.brewledger.brewledger.backend.entity.Product;
 import com.brewledger.brewledger.backend.entity.ProductCategory;
 import com.brewledger.brewledger.backend.exception.BusinessException;
@@ -45,6 +46,34 @@ public class ProductService {
         productRepository.save(product);
 
         return mapToResponse(product);
+    }
+
+    @Transactional
+    public ProductResponse update(Long id, UpdateProductRequest request) {
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Produk tidak ditemukan dengan ID: " + id
+                ));
+
+        if (productRepository.existsByCodeAndIdNot(request.getCode(), id)) {
+            throw new BusinessException(
+                    "Kode produk sudah digunakan: " + request.getCode()
+            );
+        }
+
+        ProductCategory category = categoryRepository.findById(request.getCategoryId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Kategori tidak ditemukan dengan ID: " + request.getCategoryId()
+                ));
+
+        product.setCode(request.getCode());
+        product.setName(request.getName());
+        product.setCategory(category);
+        product.setSellingPrice(request.getSellingPrice());
+        product.setDescription(request.getDescription());
+        product.setActive(request.getActive());
+
+        return mapToResponse(productRepository.save(product));
     }
 
     @Transactional(readOnly = true)

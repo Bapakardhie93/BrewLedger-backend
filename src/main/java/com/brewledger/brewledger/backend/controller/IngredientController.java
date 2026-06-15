@@ -5,6 +5,7 @@ import com.brewledger.brewledger.backend.dto.ingredient.IngredientResponse;
 import com.brewledger.brewledger.backend.service.IngredientService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import com.brewledger.brewledger.backend.dto.ingredient.LowStockResponse;
@@ -14,6 +15,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/ingredients")
 @RequiredArgsConstructor
+@PreAuthorize("hasAnyRole('ADMIN', 'MANAGEMENT', 'GUDANG')")
 public class IngredientController {
 
     private final IngredientService service;
@@ -21,6 +23,7 @@ public class IngredientController {
 
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'GUDANG')")
     public IngredientResponse create(
             @Valid
             @RequestBody CreateIngredientRequest request

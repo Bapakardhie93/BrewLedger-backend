@@ -4,6 +4,7 @@ import com.brewledger.brewledger.backend.dto.purchase.CreatePurchaseOrderItemReq
 import com.brewledger.brewledger.backend.dto.purchase.CreatePurchaseOrderRequest;
 import com.brewledger.brewledger.backend.dto.purchase.PurchaseOrderItemResponse;
 import com.brewledger.brewledger.backend.dto.purchase.PurchaseOrderResponse;
+import com.brewledger.brewledger.backend.dto.purchase.PurchaseOrderDetailResponse;
 import com.brewledger.brewledger.backend.entity.PurchaseOrderStatus;
 import com.brewledger.brewledger.backend.entity.Ingredient;
 import com.brewledger.brewledger.backend.entity.PurchaseOrder;
@@ -37,6 +38,7 @@ public class PurchaseOrderService {
     private final PurchaseOrderRepository purchaseOrderRepository;
     private final SupplierRepository supplierRepository;
     private final StockMovementRepository stockMovementRepository;
+    private final CurrentUserService currentUserService;
 
     @Transactional(readOnly = true)
     public List<PurchaseOrderItemResponse> getItems(Long purchaseOrderId) {
@@ -70,9 +72,9 @@ public class PurchaseOrderService {
                 ));
 
         // Bug Fix #4: Compare using enum name() to avoid magic string comparison
-        if (!PurchaseOrderStatus.DRAFT.name().equals(po.getStatus())) {
+        if (!PurchaseOrderStatus.APPROVED.name().equals(po.getStatus())) {
             throw new BusinessException(
-                    "PO tidak dapat diterima karena statusnya bukan DRAFT. Status saat ini: " + po.getStatus()
+                    "PO tidak dapat diterima karena belum disetujui. Status saat ini: " + po.getStatus()
             );
         }
 
@@ -126,7 +128,10 @@ public class PurchaseOrderService {
                         "Purchase Order tidak ditemukan dengan ID: " + purchaseOrderId
                 ));
 
-        if (!PurchaseOrderStatus.DRAFT.name().equals(po.getStatus())) {
+        boolean editable = PurchaseOrderStatus.DRAFT.name().equals(po.getStatus())
+                || PurchaseOrderStatus.REJECTED.name().equals(po.getStatus());
+
+        if (!editable) {
             throw new BusinessException(
                     "Tidak dapat menambah item ke PO yang sudah diproses. Status saat ini: " + po.getStatus()
             );
@@ -170,10 +175,39 @@ public class PurchaseOrderService {
         po.setOrderDate(LocalDate.now());
         po.setStatus(PurchaseOrderStatus.DRAFT.name());
         po.setNotes(request.getNotes());
+        po.setCreatedBy(currentUserService.requireCurrentUser());
 
         purchaseOrderRepository.save(po);
 
         return mapToResponse(po);
+    }
+
+    @Transactional
+    public PurchaseOrderResponse submitForApproval(Long purchaseOrderId) {
+        PurchaseOrder po = purchaseOrderRepository.findById(purchaseOrderId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Purchase Order tidak ditemukan dengan ID: " + purchaseOrderId
+                ));
+
+        boolean submittable = PurchaseOrderStatus.DRAFT.name().equals(po.getStatus())
+                || PurchaseOrderStatus.REJECTED.name().equals(po.getStatus());
+        if (!submittable) {
+            throw new BusinessException(
+                    "PO tidak dapat diajukan dari status: " + po.getStatus()
+            );
+        }
+
+        if (itemRepository.findByPurchaseOrderId(purchaseOrderId).isEmpty()) {
+            throw new BusinessException("PO harus memiliki minimal 1 item sebelum diajukan");
+        }
+
+        po.setStatus(PurchaseOrderStatus.PENDING_APPROVAL.name());
+        po.setSubmittedAt(LocalDateTime.now());
+        po.setApprovedBy(null);
+        po.setApprovedAt(null);
+        po.setRejectionReason(null);
+
+        return mapToResponse(purchaseOrderRepository.save(po));
     }
 
     @Transactional(readOnly = true)
@@ -183,6 +217,26 @@ public class PurchaseOrderService {
                 .stream()
                 .map(this::mapToResponse)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public PurchaseOrderDetailResponse findById(Long id) {
+        PurchaseOrder po = purchaseOrderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Purchase Order tidak ditemukan dengan ID: " + id
+                ));
+
+        List<PurchaseOrderItemResponse> items = getItems(id);
+
+        return new PurchaseOrderDetailResponse(
+                po.getId(),
+                po.getPoNumber(),
+                po.getSupplier().getName(),
+                po.getOrderDate(),
+                po.getStatus(),
+                po.getNotes(),
+                items
+        );
     }
 
     private PurchaseOrderResponse mapToResponse(PurchaseOrder po) {

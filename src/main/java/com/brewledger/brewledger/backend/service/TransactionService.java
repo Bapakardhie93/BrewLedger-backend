@@ -23,12 +23,15 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TransactionService {
 
+    private static final double TAX_RATE = PosService.TAX_RATE;
+
     private final TransactionRepository transactionRepository;
     private final TransactionItemRepository transactionItemRepository;
     private final ProductRepository productRepository;
     private final ProductRecipeRepository productRecipeRepository;
     private final IngredientRepository ingredientRepository;
     private final StockMovementRepository stockMovementRepository;
+    private final CurrentUserService currentUserService;
 
     /**
      * Creates a new transaction, deducts ingredient stock based on recipes,
@@ -54,6 +57,7 @@ public class TransactionService {
                 "TRX-" + System.currentTimeMillis()
         );
 
+        transaction.setCashier(currentUserService.requireCurrentUser());
         transaction.setTransactionType(request.getTransactionType());
         transaction.setPaymentMethod(request.getPaymentMethod());
         transaction.setPaymentStatus(PaymentStatus.PAID);
@@ -131,7 +135,7 @@ public class TransactionService {
             ));
         }
 
-        double tax = subtotal * 0.11;
+        double tax = subtotal * TAX_RATE;
         double total = subtotal + tax;
 
         transaction.setSubtotal(subtotal);
@@ -186,5 +190,34 @@ public class TransactionService {
                     );
                 })
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public TransactionResponse findById(Long id) {
+        Transaction transaction = transactionRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Transaksi tidak ditemukan dengan ID: " + id
+                ));
+
+        List<TransactionItemResponse> items = transactionItemRepository
+                .findByTransactionId(transaction.getId())
+                .stream()
+                .map(item -> new TransactionItemResponse(
+                        item.getProduct().getId(),
+                        item.getProductName(),
+                        item.getQuantity(),
+                        item.getUnitPrice(),
+                        item.getSubtotal()
+                ))
+                .toList();
+
+        return new TransactionResponse(
+                transaction.getId(),
+                transaction.getTransactionNumber(),
+                transaction.getSubtotal(),
+                transaction.getTax(),
+                transaction.getTotal(),
+                items
+        );
     }
 }

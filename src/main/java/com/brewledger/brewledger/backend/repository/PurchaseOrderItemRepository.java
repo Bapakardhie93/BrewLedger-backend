@@ -11,4 +11,14 @@ public interface PurchaseOrderItemRepository
     List<PurchaseOrderItem> findByPurchaseOrderId(
             Long purchaseOrderId
     );
+
+    @org.springframework.data.jpa.repository.Query("""
+           SELECT poi
+           FROM PurchaseOrderItem poi
+           WHERE poi.purchaseOrder.orderDate BETWEEN :start AND :end
+           """)
+    List<PurchaseOrderItem> findByPurchaseOrderDateRange(
+            @org.springframework.data.repository.query.Param("start") java.time.LocalDate start,
+            @org.springframework.data.repository.query.Param("end") java.time.LocalDate end
+    );
 }

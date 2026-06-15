@@ -7,4 +7,6 @@ public interface SupplierRepository
         extends JpaRepository<Supplier, Long> {
 
     boolean existsByName(String name);
+
+    boolean existsByNameAndIdNot(String name, Long id);
 }

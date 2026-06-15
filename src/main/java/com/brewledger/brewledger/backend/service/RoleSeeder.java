@@ -4,7 +4,9 @@ import com.brewledger.brewledger.backend.entity.Role;
 import com.brewledger.brewledger.backend.repository.RoleRepository;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
+import org.springframework.core.annotation.Order;
 
+@Order(1)
 @Component
 public class RoleSeeder implements CommandLineRunner {
 

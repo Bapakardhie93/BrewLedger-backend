@@ -4,6 +4,7 @@ import com.brewledger.brewledger.backend.dto.category.CategoryResponse;
 import com.brewledger.brewledger.backend.dto.category.CreateCategoryRequest;
 import com.brewledger.brewledger.backend.service.ProductCategoryService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -11,6 +12,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/categories")
 @RequiredArgsConstructor
+@PreAuthorize("hasAnyRole('ADMIN', 'MANAGEMENT')")
 public class ProductCategoryController {
 
     private final ProductCategoryService service;

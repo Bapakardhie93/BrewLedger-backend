@@ -9,7 +9,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
+import org.springframework.core.annotation.Order;
 
+@Order(2)
 @Slf4j
 @Component
 public class AdminSeeder implements CommandLineRunner {

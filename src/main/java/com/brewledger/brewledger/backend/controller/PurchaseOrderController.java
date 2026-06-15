@@ -5,17 +5,27 @@ import com.brewledger.brewledger.backend.dto.purchase.PurchaseOrderResponse;
 import com.brewledger.brewledger.backend.service.PurchaseOrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import com.brewledger.brewledger.backend.dto.purchase.CreatePurchaseOrderItemRequest;
 import com.brewledger.brewledger.backend.dto.purchase.PurchaseOrderItemResponse;
+import com.brewledger.brewledger.backend.dto.purchase.PurchaseOrderDetailResponse;
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/purchase-orders")
 @RequiredArgsConstructor
+@PreAuthorize("hasAnyRole('ADMIN', 'MANAGEMENT', 'GUDANG')")
 public class PurchaseOrderController {
 
     private final PurchaseOrderService service;
+
+    @GetMapping("/{id}")
+    public PurchaseOrderDetailResponse findById(
+            @PathVariable Long id
+    ) {
+        return service.findById(id);
+    }
 
     @GetMapping("/{id}/items")
     public List<PurchaseOrderItemResponse> getItems(
@@ -26,6 +36,7 @@ public class PurchaseOrderController {
     }
 
     @PostMapping("/{id}/receive")
+    @PreAuthorize("hasAnyRole('GUDANG', 'ADMIN')")
     public PurchaseOrderResponse receive(
             @PathVariable Long id
     ) {
@@ -34,6 +45,7 @@ public class PurchaseOrderController {
     }
 
     @PostMapping("/{id}/items")
+    @PreAuthorize("hasAnyRole('GUDANG', 'ADMIN')")
     public PurchaseOrderItemResponse addItem(
             @PathVariable Long id,
             @Valid
@@ -47,12 +59,19 @@ public class PurchaseOrderController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('GUDANG', 'ADMIN')")
     public PurchaseOrderResponse create(
             @Valid
             @RequestBody CreatePurchaseOrderRequest request
     ) {
 
         return service.create(request);
+    }
+
+    @PostMapping("/{id}/submit")
+    @PreAuthorize("hasAnyRole('GUDANG', 'ADMIN')")
+    public PurchaseOrderResponse submitForApproval(@PathVariable Long id) {
+        return service.submitForApproval(id);
     }
 
     @GetMapping
