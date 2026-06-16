@@ -21,4 +21,6 @@ public interface PurchaseOrderItemRepository
             @org.springframework.data.repository.query.Param("start") java.time.LocalDate start,
             @org.springframework.data.repository.query.Param("end") java.time.LocalDate end
     );
+
+    boolean existsByIngredientId(Long ingredientId);
 }

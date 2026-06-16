@@ -28,4 +28,6 @@ public class WarehouseResponse {
     private List<StockMovementResponse> stockMovements;
 
     private List<PurchaseApprovalResponse> approvalRequests;
+
+    private com.brewledger.brewledger.backend.dto.user.UserResponse currentUser;
 }

@@ -16,4 +16,10 @@ public class TransactionItemResponse {
     private Double unitPrice;
 
     private Double subtotal;
+
+    private Double costPrice;
+
+    private Double subtotalCost;
+
+    private String notes;
 }

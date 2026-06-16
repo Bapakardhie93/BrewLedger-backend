@@ -24,4 +24,12 @@ public class CreateProductRequest {
     private Double sellingPrice;
 
     private String description;
+
+    private Boolean useCustomHpp;
+
+    private Double customHpp;
+
+    private Double margin;
+
+    private java.util.List<RecipeItemRequest> recipeItems;
 }

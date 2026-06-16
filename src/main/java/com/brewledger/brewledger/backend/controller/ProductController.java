@@ -29,7 +29,7 @@ public class ProductController {
     private final ProductService service;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGEMENT')")
+    @PreAuthorize("hasAnyRole('MANAGEMENT')")
     public ProductResponse create(
             @Valid
             @RequestBody CreateProductRequest request
@@ -38,7 +38,7 @@ public class ProductController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGEMENT')")
+    @PreAuthorize("hasAnyRole('MANAGEMENT')")
     public ProductResponse update(
             @PathVariable Long id,
             @Valid @RequestBody UpdateProductRequest request
@@ -51,5 +51,21 @@ public class ProductController {
         return service.findAll();
     }
 
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('MANAGEMENT')")
+    public void delete(@PathVariable Long id) {
+        service.delete(id);
+    }
 
+    @PatchMapping("/{id}/activate")
+    @PreAuthorize("hasAnyRole('MANAGEMENT')")
+    public ProductResponse activate(@PathVariable Long id) {
+        return service.toggleActive(id, true);
+    }
+
+    @PatchMapping("/{id}/deactivate")
+    @PreAuthorize("hasAnyRole('MANAGEMENT')")
+    public ProductResponse deactivate(@PathVariable Long id) {
+        return service.toggleActive(id, false);
+    }
 }

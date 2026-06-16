@@ -1,6 +1,6 @@
 # BrewLedger Backend
 
-Backend REST API untuk BrewLedger, aplikasi Point of Sale (POS), inventori bahan baku, pembelian, dan pelaporan kedai. Aplikasi dibangun dengan Spring Boot, PostgreSQL, Spring Security, dan JWT.
+Backend REST API untuk BrewLedger, aplikasi Point of Sale (POS), manajemen inventori bahan baku, pembelian, dapur, meja, dan pelaporan kedai kopi. Aplikasi dibangun dengan Java 25, Spring Boot 3.5, PostgreSQL, Spring Security, dan JWT.
 
 ## Daftar Isi
 
@@ -11,268 +11,227 @@ Backend REST API untuk BrewLedger, aplikasi Point of Sale (POS), inventori bahan
 - [Konfigurasi](#konfigurasi)
 - [Menjalankan Aplikasi](#menjalankan-aplikasi)
 - [Autentikasi dan Otorisasi](#autentikasi-dan-otorisasi)
-- [Alur Bisnis](#alur-bisnis)
+- [Alur Bisnis Utama](#alur-bisnis-utama)
 - [Model Data](#model-data)
 - [Struktur Proyek](#struktur-proyek)
 - [Testing](#testing)
 - [Build dan Production](#build-dan-production)
 - [Dokumentasi API](#dokumentasi-api)
-- [Catatan Implementasi](#catatan-implementasi)
+
+---
 
 ## Fitur
 
-- Login menggunakan JWT.
-- Role awal: `ADMIN`, `MANAGEMENT`, `GUDANG`, dan `KASIR`.
-- Manajemen user oleh admin.
-- Master data kategori, produk, supplier, dan ingredient.
-- Resep produk yang menghubungkan produk dengan kebutuhan ingredient.
-- Purchase order dan penerimaan barang.
-- POS dengan pengurangan stok otomatis berdasarkan resep.
-- Riwayat pergerakan stok untuk pembelian dan penjualan.
-- Dashboard ringkasan operasional.
-- Statistik hari ini, perbandingan kemarin, dan tren tujuh hari.
-- Agregasi kategori, user aktif, stok kritis, dan pending purchase order.
-- Workspace POS khusus kasir dengan katalog berbasis ketersediaan recipe.
-- Workspace gudang untuk inventori, komposisi, movement, dan request approval.
-- Workflow persetujuan PO antara gudang dan management.
-- Laporan penjualan, pembelian, dan nilai inventori.
-- Global validation dan error response.
+### 1. Autentikasi & Otorisasi Terenkripsi
+- Login berbasis JSON Web Token (JWT).
+- Role-based Access Control (RBAC) dengan 3 role bawaan: `MANAGEMENT`, `GUDANG`, dan `KASIR`.
+- Password dienkripsi menggunakan hashing BCrypt.
+- Penegakan penggantian password wajib (`mustChangePassword`) untuk akun baru.
+
+### 2. Shift Management Terpusat (Oleh Management)
+- Kasir (`KASIR`) dan Staf Gudang (`GUDANG`) tidak dapat membuka/menutup shift secara mandiri.
+- Shift dikontrol langsung oleh role `MANAGEMENT` melalui target user ID.
+- Kasir wajib memiliki shift aktif agar dapat memproses transaksi checkout POS.
+- Kalkulasi selisih uang kas penutupan shift (`cashDifference`) secara otomatis berdasarkan kas awal dan riwayat total penjualan.
+
+### 3. POS Transaksi yang Atomik (Atomic Checkout)
+- Pemrosesan POS checkout berjalan dalam satu transaksi database tunggal (Atomic).
+- Validasi stok bahan baku otomatis berdasarkan resep produk (Recipe). Jika stok salah satu bahan baku tidak mencukupi, seluruh transaksi dan pengurangan stok di-rollback secara otomatis.
+- Sinkronisasi otomatis ke status meja restoran (`RestaurantTable`), penambahan kas shift aktif, pembuatan pesanan dapur (`KitchenOrder`), dan audit trail pergerakan stok.
+- Proteksi request ganda menggunakan validasi header `Idempotency-Key`.
+
+### 4. Persetujuan Terpusat (Centralized Approvals)
+- Seluruh aksi sensitif membutuhkan persetujuan terpusat (Centralized Approval Workflow):
+  - Void transaksi POS (`VOID_TRANSACTION`).
+  - Penyesuaian stok bahan baku manual (`STOCK_ADJUSTMENT`).
+  - Pengajuan bahan baku baru ke dalam katalog (`NEW_INGREDIENT`).
+- Validasi ketat untuk menghindari aksi pemrosesan mandiri (Self-Approval Guard).
+- Validasi peran target persetujuan (Gudang menyetujui ajuan Management, dan sebaliknya).
+- Proteksi re-processing (status yang sudah disetujui/ditolak tidak dapat diproses ulang, mengembalikan HTTP 409 Conflict).
+
+### 5. Manajemen Inventori & Audit Trail Stok
+- Riwayat pergerakan stok (`StockMovement`) terekam secara otomatis untuk setiap perubahan dengan tipe pergerakan: `SALE_CONSUMPTION`, `PURCHASE_RECEIVE`, `STOCK_REQUEST_COMPLETED`, `MANUAL_ADJUSTMENT`, `VOID_REVERSAL`.
+- Kolom kuantitas stok bertanda positif (`+`) untuk penambahan dan negatif (`-`) untuk pengurangan.
+- Pencatatan otomatis kolom `createdBy` berisi username staf yang memicu perubahan stok.
+
+### 6. Laporan Keuangan Dinamis & Ekspor CSV
+- Laporan penjualan, pembelian, dan inventori yang mendukung filter rentang tanggal (`from` / `to`) dan parameter pengelompokan (`groupBy`: `DAY`, `WEEK`, `MONTH`).
+- Ekspor laporan berformat CSV dengan penegakan eksplisit HTTP header encoding `text/csv; charset=utf-8`.
+
+### 7. Manajemen Meja & Dapur (Tables & Kitchen Orders)
+- Pembaruan status meja secara otomatis (`AVAILABLE` / `OCCUPIED`).
+- Pembuatan Kitchen Order otomatis pada saat transaksi dine-in berhasil diproses, lengkap dengan item detail dan catatan instruksi khusus (notes).
+- Pelacakan status pesanan dapur (`WAITING`, `COOKING`, `DONE`).
+
+### 8. User Heartbeat Presence & Monitor Keaktifan
+- Endpoint heartbeat (`POST /api/users/heartbeat`) untuk memperbarui status aktivitas user secara real-time.
+- Pemantauan daftar user yang sedang online berdasarkan riwayat aktivitas 5 menit terakhir.
+
+### 9. Observability
+- Endpoint monitoring kesehatan server publik `/api/health` yang memeriksa status database (UP/DOWN) serta menyertakan stempel waktu (timestamp).
+
+---
 
 ## Teknologi
 
 | Komponen | Teknologi |
 |---|---|
-| Bahasa | Java 21 |
-| Framework | Spring Boot 3.5.14 |
-| API | Spring Web MVC |
-| Database | PostgreSQL |
+| Bahasa | Java 25 |
+| Framework | Spring Boot 3.5.x |
+| Database | PostgreSQL (Supabase / Local) |
 | ORM | Spring Data JPA / Hibernate |
-| Security | Spring Security, JWT, BCrypt |
-| Validation | Jakarta Bean Validation |
-| Build | Maven Wrapper |
-| Testing | JUnit 5, Spring Boot Test, H2 |
-| Utility | Lombok, springboot3-dotenv |
+| Keamanan | Spring Security, JWT, BCrypt |
+| Validasi | Jakarta Bean Validation |
+| Build Tool | Maven Wrapper |
+| Pengujian | JUnit 5, Spring Boot Test, H2 (Compatibility Mode PostgreSQL) |
+| Library Lain | Lombok, springboot3-dotenv |
+
+---
 
 ## Arsitektur
 
-Proyek menggunakan layered architecture:
+Aplikasi menggunakan pola arsitektur berlapis (Layered Architecture):
 
 ```text
-Client (macOS/iOS/Web)
-        |
-        v
-Controller -> Service -> Repository -> PostgreSQL
-        |          |
-        |          +-> business rules dan transaction boundary
-        +-> request validation dan HTTP response
+Client (SwiftUI macOS / iOS)
+        │
+        ▼
+Controller (REST API Endpoints & Request Validation)
+        │
+        ▼
+Service (Logika Bisnis & Transaction Boundary)
+        │
+        ▼
+Repository (Data Access Layer via Spring Data JPA)
+        │
+        ▼
+Database (PostgreSQL)
 ```
 
-- `controller`: endpoint HTTP.
-- `service`: logika bisnis dan transaksi database.
-- `repository`: query dan akses data dengan Spring Data JPA.
-- `entity`: pemetaan tabel database.
-- `dto`: kontrak request dan response API.
-- `security`: parsing JWT dan pembuatan authentication context.
-- `exception`: standardisasi error aplikasi.
+---
 
 ## Prasyarat
 
-- Java Development Kit 21.
-- PostgreSQL yang dapat diakses aplikasi.
-- macOS/Linux: Maven tidak wajib karena tersedia `./mvnw`.
-- Windows: gunakan `mvnw.cmd`.
+- Java Development Kit (JDK) 25.
+- PostgreSQL Database.
+- Maven (opsional, sudah disediakan Maven Wrapper `./mvnw`).
 
-Periksa Java:
-
+Periksa versi Java Anda:
 ```bash
 java -version
 ```
 
+---
+
 ## Konfigurasi
 
-Aplikasi membaca environment variable melalui `springboot3-dotenv`. Buat file `.env` di root proyek:
+Aplikasi membaca parameter konfigurasi melalui file `.env` di root direktori proyek. Salin contoh di bawah ini dan sesuaikan dengan environment Anda:
 
 ```properties
 DB_URL=jdbc:postgresql://localhost:5432/brewledger
 DB_USERNAME=postgres
-DB_PASSWORD=change-me
+DB_PASSWORD=your_password
 
-ADMIN_FULLNAME=BrewLedger Administrator
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=change-this-admin-password
+ADMIN_FULLNAME=Satriya Dwi Mahardhika
+ADMIN_USERNAME=satriyadm9311
+ADMIN_PASSWORD=admin9311
 
-JWT_SECRET=replace-with-a-long-random-secret-at-least-32-bytes
+JWT_SECRET=your-super-long-secure-jwt-secret-key-at-least-32-bytes
 ```
 
-Jangan commit `.env` atau secret production ke Git.
+> [!WARNING]
+> Jangan pernah meng-commit file `.env` atau kredensial produksi ke Git. File `.env` sudah masuk ke dalam `.gitignore`.
 
-### Environment Variable
-
-| Variable | Wajib | Keterangan |
-|---|---:|---|
-| `DB_URL` | Ya | JDBC URL PostgreSQL |
-| `DB_USERNAME` | Ya | Username database |
-| `DB_PASSWORD` | Ya | Password database |
-| `ADMIN_FULLNAME` | Ya | Nama admin bootstrap |
-| `ADMIN_USERNAME` | Ya | Username admin bootstrap |
-| `ADMIN_PASSWORD` | Ya | Password awal admin bootstrap |
-| `JWT_SECRET` | Ya | Secret HMAC JWT; gunakan nilai acak yang panjang |
-
-Konfigurasi default berada di `src/main/resources/application.properties`:
-
-- Port: `8081`.
-- Hibernate: `ddl-auto=update`.
-- JWT expiration: `86400000` ms atau 24 jam.
-- SQL logging: aktif.
-
-Profile `prod` mengubah Hibernate menjadi `validate` dan menonaktifkan SQL logging. Karena belum ada Flyway/Liquibase, schema production harus sudah tersedia sebelum aplikasi dijalankan dengan profile ini.
+---
 
 ## Menjalankan Aplikasi
 
-### Development
-
+### Mode Pengembangan (Development)
+Jalankan perintah berikut pada terminal di root direktori proyek:
 ```bash
 ./mvnw spring-boot:run
 ```
 
-Windows:
-
-```powershell
-.\mvnw.cmd spring-boot:run
-```
-
-Server tersedia di:
-
+Aplikasi akan berjalan di port `8081` secara default:
 ```text
 http://localhost:8081
 ```
 
 ### Verifikasi Login
-
+Anda dapat menguji apakah server berjalan dan kredensial admin default berfungsi menggunakan `curl`:
 ```bash
 curl -X POST http://localhost:8081/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{
-    "username": "admin",
-    "password": "change-this-admin-password"
+    "username": "satriyadm9311",
+    "password": "admin9311"
   }'
 ```
 
-Gunakan token dari response:
-
-```bash
-curl http://localhost:8081/api/dashboard \
-  -H "Authorization: Bearer <JWT_TOKEN>"
-```
+---
 
 ## Autentikasi dan Otorisasi
 
-`POST /api/auth/login` adalah satu-satunya endpoint publik. Endpoint lain membutuhkan header:
-
+Seluruh endpoint API dilindungi oleh otentikasi JWT (kecuali `/api/auth/login` dan `/api/health`). Kirimkan token yang Anda dapatkan saat login pada header HTTP `Authorization`:
 ```http
-Authorization: Bearer <token>
+Authorization: Bearer <JWT_TOKEN>
 ```
 
-Saat startup, aplikasi membuat role berikut jika belum ada:
+### Pemetaan Role Bawaan
+- **`MANAGEMENT`**: Mengakses laporan penjualan, riwayat audit log, shift management, dashboard, menu approval terpusat, dan purchase order approval.
+- **`GUDANG`**: Mengakses workspace inventori bahan baku, pergerakan stok, pengajuan update stok, pembuatan purchase order, serta penerimaan barang PO.
+- **`KASIR`**: Mengakses POS menu catalog, pembuatan transaksi checkout, dan detail struk belanja.
 
-| Role | Tujuan |
-|---|---|
-| `ADMIN` | Administrator sistem |
-| `MANAGEMENT` | Pengelolaan bisnis dan laporan |
-| `GUDANG` | Pengelolaan stok dan bahan baku |
-| `KASIR` | Transaksi penjualan |
+---
 
-Admin awal dibuat dari environment variable jika username tersebut belum ada. Password disimpan menggunakan BCrypt.
+## Alur Bisnis Utama
 
-Endpoint utama dibedakan berdasarkan role:
-
-- `ADMIN`: seluruh endpoint role-specific dan manajemen user.
-- `MANAGEMENT`: dashboard, approval PO, dan laporan.
-- `KASIR`: katalog serta checkout melalui `/api/pos/**`.
-- `GUDANG`: workspace inventori dan operasional PO.
-
-## Alur Bisnis
-
-### Bootstrap
-
-1. Aplikasi membuat role bawaan.
-2. Aplikasi membuat admin awal jika `ADMIN_USERNAME` belum terdaftar.
-3. Admin awal memiliki `mustChangePassword=true`.
-
-Belum tersedia endpoint khusus untuk mengganti password sendiri atau mengubah flag `mustChangePassword`.
-
-### Purchase Order
-
-1. Gudang membuat PO dengan status `DRAFT`.
-2. Gudang menambahkan satu atau lebih item ingredient.
-3. Gudang mengajukan PO sehingga status menjadi `PENDING_APPROVAL`.
-4. Management menyetujui menjadi `APPROVED` atau menolak menjadi `REJECTED`.
-5. Gudang menerima PO yang sudah disetujui.
-6. Stok ingredient bertambah dan movement `PURCHASE` dibuat.
-7. Status PO menjadi `RECEIVED`.
-
-Item dapat ditambahkan saat PO berstatus `DRAFT` atau `REJECTED`. PO hanya dapat diterima setelah berstatus `APPROVED`, dan penerimaan PO kosong ditolak.
-
-### Transaksi POS
-
-1. Client mengirim jenis transaksi, metode pembayaran, dan item produk.
-2. Harga produk aktif saat request dipakai sebagai `unitPrice`.
-3. Subtotal dihitung dari seluruh item.
-4. Pajak dihitung tetap sebesar 11%.
-5. Status pembayaran otomatis menjadi `PAID`.
-6. Setiap resep produk dihitung berdasarkan jumlah produk.
-7. Stok ingredient dikurangi dan stock movement `SALE` dibuat.
-
-Pembuatan transaksi berjalan dalam satu database transaction. Jika stok salah satu ingredient tidak cukup, seluruh perubahan transaksi dan stok di-rollback.
-
-Produk tanpa recipe tetap dapat dijual dan tidak mengurangi ingredient.
-
-### Low Stock
-
-Ingredient masuk daftar low stock jika:
-
-```text
-currentStock <= minimumStock
+### 1. Alur Kerja Pengadaan Barang (Purchase Order)
+```mermaid
+graph TD
+    A[Staf Gudang: Buat PO Draft] --> B[Gudang: Tambah Item Bahan Baku]
+    B --> C[Gudang: Kirim Ajuan PO]
+    C --> D{Management: Review PO}
+    D -- Setujui --> E[Status: APPROVED]
+    D -- Tolak --> F[Status: REJECTED]
+    E --> G[Gudang: Terima Barang PO]
+    G --> H[Stok Bertambah & Movement PURCHASE_RECEIVE Tercatat]
+    H --> I[Status PO: RECEIVED]
 ```
+
+### 2. Alur POS Transaksi (Atomic POS Checkout)
+```mermaid
+graph TD
+    A[Kasir: Kirim POS Checkout Request] --> B{Sistem: Cek Shift Aktif Kasir}
+    B -- Tidak Ada Shift --> C[Kembalikan 422: Shift Belum Dibuka]
+    B -- Shift Aktif --> D{Sistem: Validasi Kecukupan Stok Bahan Baku via Resep}
+    D -- Stok Kurang --> E[Rollback Transaksi & Kembalikan 422]
+    D -- Stok Cukup --> F[Simpan Transaksi & Kurangi Stok]
+    F --> G[Buat Kitchen Order & Update Meja OCCUPIED]
+    G --> H[Buat StockMovement SALE_CONSUMPTION & Tambah Kas Shift]
+    H --> I[Kembalikan Struk Transaksi 200 OK]
+```
+
+---
 
 ## Model Data
 
-```mermaid
-erDiagram
-    ROLE ||--o{ USER : has
-    PRODUCT_CATEGORY ||--o{ PRODUCT : groups
-    SUPPLIER ||--o{ INGREDIENT : supplies
-    PRODUCT ||--o{ PRODUCT_RECIPE : uses
-    INGREDIENT ||--o{ PRODUCT_RECIPE : included_in
-    SUPPLIER ||--o{ PURCHASE_ORDER : receives
-    PURCHASE_ORDER ||--o{ PURCHASE_ORDER_ITEM : contains
-    INGREDIENT ||--o{ PURCHASE_ORDER_ITEM : ordered
-    USER ||--o{ PURCHASE_ORDER : creates
-    USER ||--o{ TRANSACTION : handles
-    TRANSACTION ||--o{ TRANSACTION_ITEM : contains
-    PRODUCT ||--o{ TRANSACTION_ITEM : sold
-    INGREDIENT ||--o{ STOCK_MOVEMENT : changes
-```
+Tabel-tabel database yang digunakan dalam aplikasi ini meliputi:
 
-Semua entity mewarisi `id`, `createdAt`, dan `updatedAt` dari `BaseEntity`.
+1. **`users`** & **`roles`**: Mengelola kredensial staf dan hak akses (RBAC).
+2. **`products`** & **`product_categories`**: Mengelola produk menu kafe beserta kategorinya.
+3. **`ingredients`** & **`suppliers`**: Mengelola bahan baku dasar dan pemasoknya.
+4. **`product_recipes`**: Pemetaan kebutuhan bahan baku (ingredient) untuk setiap produk.
+5. **`cashier_shifts`**: Mengelola siklus shift kasir (pembukaan, penutupan, saldo kas awal, saldo kas akhir, selisih kas).
+6. **`transactions`** & **`transaction_items`**: Menyimpan struk transaksi POS.
+7. **`kitchen_orders`** & **`kitchen_order_items`**: Pesanan yang diteruskan ke dapur untuk diproses.
+8. **`restaurant_tables`**: Nomor meja dan status keterisian meja.
+9. **`purchase_orders`** & **`purchase_order_items`**: Mengelola pengadaan bahan baku ke supplier.
+10. **`approval_requests`**: Log persetujuan terpusat untuk void transaksi, adjustment stok, dan ingredient baru.
+11. **`stock_movements`**: Log riwayat pergerakan stok bahan baku (audit trail).
+12. **`activity_logs`**: Log aktivitas audit trail tindakan sensitif user di sistem.
 
-| Entity | Fungsi utama |
-|---|---|
-| `User`, `Role` | Identitas, status user, dan hak akses |
-| `ProductCategory`, `Product` | Master produk yang dijual |
-| `Supplier`, `Ingredient` | Master pemasok dan bahan baku |
-| `ProductRecipe` | Jumlah ingredient untuk satu unit produk |
-| `PurchaseOrder`, `PurchaseOrderItem` | Dokumen pembelian dan rinciannya |
-| `Transaction`, `TransactionItem` | Header dan rincian penjualan |
-| `StockMovement` | Audit perubahan stok ingredient |
-
-Nilai enum:
-
-- `TransactionType`: `DINE_IN`, `TAKE_AWAY`.
-- `PaymentMethod`: `CASH`, `QRIS`, `CARD`.
-- `PaymentStatus`: `PENDING`, `PAID`, `CANCELLED`.
-- `PurchaseOrderStatus`: `DRAFT`, `PENDING_APPROVAL`, `APPROVED`, `RECEIVED`, `REJECTED`, `CANCELLED`.
-- Stock movement yang saat ini dibuat service: `PURCHASE`, `SALE`.
+---
 
 ## Struktur Proyek
 
@@ -280,101 +239,61 @@ Nilai enum:
 src/
 ├── main/
 │   ├── java/com/brewledger/brewledger/backend/
-│   │   ├── config/
-│   │   ├── controller/
-│   │   ├── dto/
-│   │   ├── entity/
-│   │   ├── enums/
-│   │   ├── exception/
-│   │   ├── repository/
-│   │   ├── security/
-│   │   └── service/
+│   │   ├── config/          # Konfigurasi aplikasi (CORS, Security, Thread pool)
+│   │   ├── controller/      # REST API Controllers (HTTP Endpoints)
+│   │   ├── dto/             # Data Transfer Objects (Request/Response Contract)
+│   │   ├── entity/          # JPA Entities (Database Tables mapping)
+│   │   ├── enums/           # Java Enums (Status, Tipe Pembayaran)
+│   │   ├── exception/       # Exception Handling & Custom Business Exceptions
+│   │   ├── repository/      # Spring Data JPA Repositories
+│   │   ├── security/        # JWT Authentication Filter & User Details Service
+│   │   └── service/         # Logika Bisnis Utama (Core Services)
 │   └── resources/
 │       ├── application.properties
 │       └── application-prod.properties
 └── test/
-    ├── java/
-    └── resources/application.properties
+    └── java/com/brewledger/brewledger/backend/
+        ├── ManagementWorkflowIntegrationTests.java # Integrasi Workflow Manajemen
+        └── NewFeaturesIntegrationTests.java        # Integrasi Fitur POS, PO, Shifts, dll.
 ```
+
+---
 
 ## Testing
 
-Jalankan:
+Backend BrewLedger dilengkapi dengan pengujian integrasi penuh (`Integration Tests`) menggunakan database H2 in-memory. Untuk menjalankan pengujian, gunakan perintah berikut:
 
 ```bash
 ./mvnw test
 ```
 
-Test menggunakan H2 in-memory dalam compatibility mode PostgreSQL. Saat ini tersedia smoke test Spring context, dashboard, katalog POS, workspace gudang, dan workflow PO sampai stok diterima. Test otorisasi HTTP dan edge case transaksi masih perlu diperluas.
+Semua pengujian (35 test cases) mencakup:
+- Validasi siklus PO, re-calculation HPP, dan harga pokok penjualan.
+- Manajemen shift kasir dan pembatasan hak akses.
+- Integrasi transaksi POS atomik dan pengurangan stok.
+- Persetujuan terpusat (Centralized Approvals) dan pencegahan self-approval.
+- Log audit pergerakan stok, ekspor laporan, dan kesehatan database.
+
+---
 
 ## Build dan Production
 
-Build JAR:
-
+### Kompilasi (Build Package JAR)
+Untuk mengompilasi proyek menjadi file executable JAR:
 ```bash
 ./mvnw clean package
 ```
+File JAR hasil kompilasi akan berada di folder `target/brewledger.backend-0.0.1-SNAPSHOT.jar`.
 
-Jalankan JAR:
-
-```bash
-java -jar target/brewledger.backend-0.0.1-SNAPSHOT.jar
-```
-
-Jalankan profile production:
-
-```bash
-java -Dspring.profiles.active=prod \
-  -jar \
-  target/brewledger.backend-0.0.1-SNAPSHOT.jar
-```
-
-Atau:
-
+### Menjalankan File JAR
+Jalankan aplikasi produksi menggunakan profile `prod`:
 ```bash
 SPRING_PROFILES_ACTIVE=prod java -jar target/brewledger.backend-0.0.1-SNAPSHOT.jar
 ```
 
-Checklist production:
-
-- Gunakan secret JWT acak dan kuat.
-- Ubah password admin bootstrap.
-- Batasi CORS dari wildcard ke origin frontend yang diizinkan.
-- Siapkan schema database sebelum memakai `ddl-auto=validate`.
-- Gunakan TLS/HTTPS di reverse proxy atau platform deployment.
-- Simpan credential melalui secret manager platform.
-- Tambahkan database migration dan backup policy.
+---
 
 ## Dokumentasi API
 
-Kontrak endpoint, request, response, status code, dan contoh integrasi tersedia di [API_DOCUMENTATION.md](API_DOCUMENTATION.md).
-
-Ringkasan endpoint:
-
-| Modul | Base path |
-|---|---|
-| Authentication | `/api/auth` |
-| Dashboard | `/api/dashboard` |
-| Users | `/api/users` |
-| Categories | `/api/categories` |
-| Products | `/api/products` |
-| Suppliers | `/api/suppliers` |
-| Ingredients | `/api/ingredients` |
-| Recipes | `/api/product-recipes` |
-| Purchase orders | `/api/purchase-orders` |
-| Transactions | `/api/transactions` |
-| Stock movements | `/api/stock-movements` |
-| Reports | `/api/reports` |
-
-## Catatan Implementasi
-
-- Belum ada Swagger/OpenAPI endpoint.
-- Belum ada pagination pada endpoint list.
-- Belum ada update/delete untuk master kategori, produk, supplier, ingredient, dan recipe.
-- Belum ada endpoint daftar role; `roleId` user harus diambil langsung dari data bootstrap/database.
-- Belum ada endpoint cancel PO atau transaksi.
-- Nomor transaksi dan PO dibuat dari `System.currentTimeMillis()`.
-- Nilai uang masih menggunakan `Double`, bukan `BigDecimal`.
-- Transaksi baru mencatat user login sebagai kasir dan PO baru mencatat user pembuat.
-- Response transaksi belum menampilkan transaction type, payment method, payment status, notes, atau waktu transaksi.
-- CORS saat ini menerima seluruh origin pattern dan perlu dibatasi untuk production.
+Seluruh endpoint, parameter request, format response JSON, status code, dan contoh integrasi klien terdokumentasi dengan sangat lengkap dan jelas di dalam file:
+👉 **[API_DOCUMENTATION.md](API_DOCUMENTATION.md)**

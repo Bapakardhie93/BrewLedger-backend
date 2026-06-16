@@ -27,7 +27,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     ) {
 
         return request.getServletPath()
-                .startsWith("/api/auth");
+                .equals("/api/auth/login");
     }
 
     @Override

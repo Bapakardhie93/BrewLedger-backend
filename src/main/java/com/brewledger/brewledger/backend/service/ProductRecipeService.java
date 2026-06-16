@@ -84,4 +84,57 @@ public class ProductRecipeService {
                 recipe.getQuantityRequired()
         );
     }
+
+    @Transactional(readOnly = true)
+    public ProductRecipeResponse findById(Long id) {
+        ProductRecipe recipe = recipeRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Resep tidak ditemukan dengan ID: " + id
+                ));
+        return mapToResponse(recipe);
+    }
+
+    @Transactional
+    public ProductRecipeResponse update(Long id, com.brewledger.brewledger.backend.dto.recipe.UpdateProductRecipeRequest request) {
+        ProductRecipe recipe = recipeRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Resep tidak ditemukan dengan ID: " + id
+                ));
+
+        Product product = productRepository.findById(request.getProductId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Produk tidak ditemukan dengan ID: " + request.getProductId()
+                ));
+
+        Ingredient ingredient = ingredientRepository.findById(request.getIngredientId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Ingredient tidak ditemukan dengan ID: " + request.getIngredientId()
+                ));
+
+        boolean exists = recipeRepository.existsByProductIdAndIngredientIdAndIdNot(
+                request.getProductId(), request.getIngredientId(), id
+        );
+
+        if (exists) {
+            throw new BusinessException(
+                    "Recipe untuk produk '" + product.getName()
+                            + "' dengan ingredient '" + ingredient.getName() + "' sudah terdaftar"
+            );
+        }
+
+        recipe.setProduct(product);
+        recipe.setIngredient(ingredient);
+        recipe.setQuantityRequired(request.getQuantityRequired());
+
+        return mapToResponse(recipeRepository.save(recipe));
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        ProductRecipe recipe = recipeRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Resep tidak ditemukan dengan ID: " + id
+                ));
+        recipeRepository.delete(recipe);
+    }
 }

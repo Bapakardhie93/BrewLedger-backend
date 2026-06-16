@@ -29,4 +29,8 @@ public class CreateIngredientRequest {
     @NotNull
     @PositiveOrZero
     private Double costPrice;
+
+    private Double purchasePrice;
+
+    private Double packSize;
 }

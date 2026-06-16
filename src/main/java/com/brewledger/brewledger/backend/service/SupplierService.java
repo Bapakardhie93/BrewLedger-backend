@@ -20,6 +20,7 @@ public class SupplierService {
 
     private final SupplierRepository repository;
     private final IngredientRepository ingredientRepository;
+    private final ActivityLogService activityLogService;
 
     @Transactional
     public SupplierResponse create(CreateSupplierRequest request) {
@@ -37,9 +38,12 @@ public class SupplierService {
         supplier.setEmail(request.getEmail());
         supplier.setAddress(request.getAddress());
 
-        repository.save(supplier);
+        Supplier saved = repository.save(supplier);
+        activityLogService.record("CREATE_SUPPLIER", 
+                "Created supplier: " + saved.getName(),
+                "SUPPLIER", saved.getId());
 
-        return mapToResponse(supplier);
+        return mapToResponse(saved);
     }
 
     @Transactional(readOnly = true)
@@ -71,7 +75,11 @@ public class SupplierService {
         supplier.setAddress(request.getAddress());
         supplier.setActive(request.getActive());
 
-        return mapToResponse(repository.save(supplier));
+        Supplier saved = repository.save(supplier);
+        activityLogService.record("UPDATE_SUPPLIER", 
+                "Updated supplier: " + saved.getName(),
+                "SUPPLIER", saved.getId());
+        return mapToResponse(saved);
     }
 
     @Transactional
@@ -88,6 +96,33 @@ public class SupplierService {
         }
 
         repository.delete(supplier);
+        activityLogService.record("DELETE_SUPPLIER", 
+                "Deleted supplier: " + supplier.getName(),
+                "SUPPLIER", supplier.getId());
+    }
+
+    @Transactional(readOnly = true)
+    public SupplierResponse findById(Long id) {
+        Supplier supplier = repository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Supplier tidak ditemukan dengan ID: " + id
+                ));
+        return mapToResponse(supplier);
+    }
+
+    @Transactional
+    public SupplierResponse toggleActive(Long id, boolean active) {
+        Supplier supplier = repository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Supplier tidak ditemukan dengan ID: " + id
+                ));
+
+        supplier.setActive(active);
+        Supplier saved = repository.save(supplier);
+        activityLogService.record("TOGGLE_SUPPLIER_ACTIVE", 
+                "Toggled active status of supplier: " + saved.getName() + " to " + active,
+                "SUPPLIER", saved.getId());
+        return mapToResponse(saved);
     }
 
     private SupplierResponse mapToResponse(Supplier supplier) {

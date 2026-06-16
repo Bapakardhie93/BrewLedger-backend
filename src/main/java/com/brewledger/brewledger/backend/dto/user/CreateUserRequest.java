@@ -18,4 +18,6 @@ public class CreateUserRequest {
 
     @NotNull(message = "Role ID wajib diisi")
     private Long roleId;
+
+    private String phoneNumber;
 }

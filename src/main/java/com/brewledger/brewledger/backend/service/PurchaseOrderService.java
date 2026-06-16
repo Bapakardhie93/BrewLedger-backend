@@ -39,6 +39,8 @@ public class PurchaseOrderService {
     private final SupplierRepository supplierRepository;
     private final StockMovementRepository stockMovementRepository;
     private final CurrentUserService currentUserService;
+    private final ActivityLogService activityLogService;
+    private final NotificationService notificationService;
 
     @Transactional(readOnly = true)
     public List<PurchaseOrderItemResponse> getItems(Long purchaseOrderId) {
@@ -84,6 +86,8 @@ public class PurchaseOrderService {
             throw new BusinessException("Tidak dapat menerima PO yang tidak memiliki item");
         }
 
+        String username = currentUserService.requireCurrentUser().getUsername();
+
         for (PurchaseOrderItem item : items) {
 
             Ingredient ingredient = item.getIngredient();
@@ -91,6 +95,12 @@ public class PurchaseOrderService {
             Double stockAfter = stockBefore + item.getQuantity();
 
             ingredient.setCurrentStock(stockAfter);
+            ingredient.setPurchasePrice(item.getUnitPrice());
+            if (ingredient.getPackSize() != null && ingredient.getPackSize() > 0.0) {
+                ingredient.setCostPrice(item.getUnitPrice() / ingredient.getPackSize());
+            } else {
+                ingredient.setCostPrice(item.getUnitPrice());
+            }
             ingredientRepository.save(ingredient);
 
             StockMovement movement = new StockMovement();
@@ -98,15 +108,22 @@ public class PurchaseOrderService {
             movement.setQuantity(item.getQuantity());
             movement.setStockBefore(stockBefore);
             movement.setStockAfter(stockAfter);
-            movement.setMovementType("PURCHASE");
+            movement.setMovementType("PURCHASE_RECEIVE");
             movement.setReferenceNumber(po.getPoNumber());
             movement.setMovementDate(LocalDateTime.now());
+            movement.setCreatedBy(username);
 
             stockMovementRepository.save(movement);
         }
 
         po.setStatus(PurchaseOrderStatus.RECEIVED.name());
         purchaseOrderRepository.save(po);
+
+        // Record Audit Log and Send Notification
+        activityLogService.record("RECEIVE_PURCHASE_ORDER", 
+                "Received Purchase Order: " + po.getPoNumber() + " by " + username,
+                "PURCHASE_ORDER", po.getId());
+        notificationService.sendAlert("Purchase Order Diterima: " + po.getPoNumber() + " telah diterima oleh " + username);
 
         log.info("Purchase Order received: {}", po.getPoNumber());
 
@@ -179,6 +196,11 @@ public class PurchaseOrderService {
 
         purchaseOrderRepository.save(po);
 
+        // Record Audit Log
+        activityLogService.record("CREATE_PURCHASE_ORDER", 
+                "Created Purchase Order: " + po.getPoNumber() + " for supplier " + supplier.getName(),
+                "PURCHASE_ORDER", po.getId());
+
         return mapToResponse(po);
     }
 
@@ -207,7 +229,17 @@ public class PurchaseOrderService {
         po.setApprovedAt(null);
         po.setRejectionReason(null);
 
-        return mapToResponse(purchaseOrderRepository.save(po));
+        PurchaseOrder savedPo = purchaseOrderRepository.save(po);
+
+        // Record Audit Log & Send Notification
+        String username = currentUserService.requireCurrentUser().getUsername();
+        activityLogService.record("SUBMIT_PURCHASE_ORDER", 
+                "Submitted Purchase Order for approval: " + savedPo.getPoNumber() + " by " + username,
+                "PURCHASE_ORDER", savedPo.getId());
+        notificationService.sendAlert("Purchase Order Baru Diajukan: " + savedPo.getPoNumber() 
+                + " untuk supplier " + savedPo.getSupplier().getName() + " oleh " + username + ". Membutuhkan Approval.");
+
+        return mapToResponse(savedPo);
     }
 
     @Transactional(readOnly = true)

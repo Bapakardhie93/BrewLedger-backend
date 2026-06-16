@@ -18,4 +18,10 @@ public interface ProductRecipeRepository
     List<ProductRecipe> findByProductId(
             Long productId
     );
+
+    boolean existsByIngredientId(Long ingredientId);
+
+    boolean existsByProductIdAndIngredientIdAndIdNot(Long productId, Long ingredientId, Long id);
+
+    void deleteByProductId(Long productId);
 }

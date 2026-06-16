@@ -15,6 +15,8 @@ public interface TransactionItemRepository
             Long transactionId
     );
 
+    boolean existsByProductId(Long productId);
+
     @Query("""
            SELECT new com.brewledger.brewledger.backend.dto.dashboard.TopSellingProductResponse(
                ti.productName,

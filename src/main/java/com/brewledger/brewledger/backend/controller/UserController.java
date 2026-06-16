@@ -17,30 +17,33 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')") // Semua endpoint di controller ini hanya bisa diakses ADMIN
 public class UserController {
 
     private final UserService userService;
 
     @GetMapping
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<UserResponse>> getAllUsers() {
         List<UserResponse> users = userService.getAllUsers();
         return ResponseEntity.ok(users);
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<UserResponse> getUserById(@PathVariable Long id) {
         UserResponse user = userService.getUserById(id);
         return ResponseEntity.ok(user);
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('MANAGEMENT')")
     public ResponseEntity<UserResponse> createUser(@Valid @RequestBody CreateUserRequest request) {
         UserResponse user = userService.createUser(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(user);
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('MANAGEMENT')")
     public ResponseEntity<UserResponse> updateUser(
             @PathVariable Long id,
             @Valid @RequestBody UpdateUserRequest request) {
@@ -49,20 +52,37 @@ public class UserController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('MANAGEMENT')")
     public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
         userService.deleteUser(id);
         return ResponseEntity.ok().build();
     }
 
     @PatchMapping("/{id}/activate")
+    @PreAuthorize("hasRole('MANAGEMENT')")
     public ResponseEntity<Void> activateUser(@PathVariable Long id) {
         userService.activateUser(id);
         return ResponseEntity.ok().build();
     }
 
     @PatchMapping("/{id}/deactivate")
+    @PreAuthorize("hasRole('MANAGEMENT')")
     public ResponseEntity<Void> deactivateUser(@PathVariable Long id) {
         userService.deactivateUser(id);
         return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/heartbeat")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Void> heartbeat(java.security.Principal principal) {
+        userService.updateLastActivity(principal.getName());
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/online")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<List<UserResponse>> getOnlineUsers(@RequestParam(required = false) String role) {
+        List<UserResponse> onlineUsers = userService.getOnlineUsers(role);
+        return ResponseEntity.ok(onlineUsers);
     }
 }

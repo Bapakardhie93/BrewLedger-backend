@@ -11,6 +11,8 @@ public interface IngredientRepository
 
     boolean existsByCode(String code);
 
+    boolean existsByCodeAndIdNot(String code, Long id);
+
     boolean existsBySupplierId(Long supplierId);
 
     @Query("""

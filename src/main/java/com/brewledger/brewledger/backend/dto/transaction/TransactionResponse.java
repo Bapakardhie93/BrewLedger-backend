@@ -19,5 +19,29 @@ public class TransactionResponse {
 
     private Double total;
 
+    private Double discountAmount;
+
+    private String discountNotes;
+
+    private String customerName;
+
+    private String tableNumber;
+
+    private Double cashReceived;
+
+    private Double changeAmount;
+
     private List<TransactionItemResponse> items;
+
+    private java.time.LocalDateTime transactionDate;
+
+    private String status;
+
+    private String transactionType;
+
+    private String paymentMethod;
+
+    private String cashierName;
+
+    private String invoiceNumber;
 }

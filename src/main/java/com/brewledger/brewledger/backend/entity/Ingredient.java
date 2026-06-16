@@ -33,5 +33,11 @@ public class Ingredient extends BaseEntity {
     private Double costPrice = 0.0;
 
     @Column(nullable = false)
+    private Double purchasePrice = 0.0;
+
+    @Column(nullable = false)
+    private Double packSize = 1.0;
+
+    @Column(nullable = false)
     private Boolean active = true;
 }

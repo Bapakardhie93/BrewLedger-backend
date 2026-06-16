@@ -46,9 +46,9 @@ public class AdminSeeder implements CommandLineRunner {
             return;
         }
 
-        Role adminRole = roleRepository.findByName("ADMIN")
+        Role adminRole = roleRepository.findByName("MANAGEMENT")
                 .orElseThrow(() ->
-                        new RuntimeException("Role ADMIN tidak ditemukan"));
+                        new RuntimeException("Role MANAGEMENT tidak ditemukan"));
 
         User admin = new User();
 

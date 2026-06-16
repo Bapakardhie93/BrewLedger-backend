@@ -1,13 +1,29 @@
 package com.brewledger.brewledger.backend.dto.warehouse;
 
-import jakarta.validation.constraints.NotBlank;
-import lombok.Getter;
 import lombok.Setter;
 
-@Getter
 @Setter
 public class RejectPurchaseOrderRequest {
 
-    @NotBlank
     private String reason;
+    private String rejectReason;
+
+    public String getReason() {
+        if (reason != null && !reason.trim().isEmpty()) {
+            return reason;
+        }
+        return rejectReason;
+    }
+
+    public String getRejectReason() {
+        if (rejectReason != null && !rejectReason.trim().isEmpty()) {
+            return rejectReason;
+        }
+        return reason;
+    }
+
+    public String getEffectiveReason() {
+        String eff = getReason();
+        return eff != null ? eff.trim() : "";
+    }
 }

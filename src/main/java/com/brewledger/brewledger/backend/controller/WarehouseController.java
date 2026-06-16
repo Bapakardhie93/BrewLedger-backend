@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/warehouse")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('GUDANG', 'ADMIN')")
+@PreAuthorize("hasAnyRole('GUDANG', 'MANAGEMENT')")
 public class WarehouseController {
 
     private final WarehouseService warehouseService;

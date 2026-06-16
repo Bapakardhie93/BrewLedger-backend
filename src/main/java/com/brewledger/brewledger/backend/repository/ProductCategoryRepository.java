@@ -11,4 +11,6 @@ public interface ProductCategoryRepository
     Optional<ProductCategory> findByName(String name);
 
     boolean existsByName(String name);
+
+    boolean existsByNameAndIdNot(String name, Long id);
 }

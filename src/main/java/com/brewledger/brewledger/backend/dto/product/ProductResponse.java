@@ -14,4 +14,12 @@ public class ProductResponse {
     private Double sellingPrice;
     private String description;
     private Boolean active;
+
+    private Boolean useCustomHpp;
+    private Double customHpp;
+    private Double calculatedHpp;
+    private Double hpp;
+    private Double margin;
+    private Double recommendedSellingPrice;
+    private java.util.List<com.brewledger.brewledger.backend.dto.recipe.ProductRecipeResponse> recipeItems;
 }

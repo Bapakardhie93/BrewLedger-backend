@@ -15,5 +15,7 @@ public class IngredientResponse {
     private Double currentStock;
     private Double minimumStock;
     private Double costPrice;
+    private Double purchasePrice;
+    private Double packSize;
     private Boolean active;
 }

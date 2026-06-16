@@ -27,6 +27,10 @@ public class UpdateWarehouseIngredientRequest {
     @PositiveOrZero
     private Double costPrice;
 
+    private Double purchasePrice;
+
+    private Double packSize;
+
     @NotNull
     private Boolean active;
 }

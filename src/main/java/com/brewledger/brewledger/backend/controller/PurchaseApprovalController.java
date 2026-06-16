@@ -18,7 +18,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/approvals/purchase-orders")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('ADMIN', 'MANAGEMENT')")
+@PreAuthorize("hasAnyRole('MANAGEMENT')")
 public class PurchaseApprovalController {
 
     private final PurchaseApprovalService purchaseApprovalService;
@@ -36,8 +36,12 @@ public class PurchaseApprovalController {
     @PostMapping("/{id}/reject")
     public PurchaseApprovalResponse reject(
             @PathVariable Long id,
-            @Valid @RequestBody RejectPurchaseOrderRequest request
+            @RequestBody RejectPurchaseOrderRequest request
     ) {
-        return purchaseApprovalService.reject(id, request.getReason());
+        String effectiveReason = request.getEffectiveReason();
+        if (effectiveReason.isEmpty()) {
+            throw new com.brewledger.brewledger.backend.exception.BusinessException("Alasan penolakan (reason/rejectReason) wajib diisi");
+        }
+        return purchaseApprovalService.reject(id, effectiveReason);
     }
 }

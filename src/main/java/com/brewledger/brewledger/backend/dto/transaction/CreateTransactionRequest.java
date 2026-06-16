@@ -21,6 +21,16 @@ public class CreateTransactionRequest {
 
     private String notes;
 
+    private Double discountAmount;
+
+    private String discountNotes;
+
+    private String customerName;
+
+    private String tableNumber;
+
+    private Double cashReceived;
+
     @NotEmpty
     private List<CreateTransactionItemRequest> items;
 }

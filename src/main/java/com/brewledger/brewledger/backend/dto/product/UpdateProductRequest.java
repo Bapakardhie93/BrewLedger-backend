@@ -27,4 +27,12 @@ public class UpdateProductRequest {
 
     @NotNull(message = "Status aktif wajib diisi")
     private Boolean active;
+
+    private Boolean useCustomHpp;
+
+    private Double customHpp;
+
+    private Double margin;
+
+    private java.util.List<RecipeItemRequest> recipeItems;
 }

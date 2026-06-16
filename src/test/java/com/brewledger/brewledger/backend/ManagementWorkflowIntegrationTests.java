@@ -156,6 +156,7 @@ class ManagementWorkflowIntegrationTests {
         assertThat(created.getRequestedByName()).isEqualTo("Test Admin");
         assertThat(created.getProcessedByName()).isNull();
 
+        authenticateAs("KASIR");
         assertThatThrownBy(() -> stockRequestController.process(created.getId()))
                 .isInstanceOf(AccessDeniedException.class);
 
@@ -176,12 +177,13 @@ class ManagementWorkflowIntegrationTests {
         assertThat(completed.getStatus()).isEqualTo(StockRequestStatus.COMPLETED.name());
         assertThat(completed.getCompletedAt()).isNotNull();
         assertThat(ingredientRepository.findById(ingredient.getId()).orElseThrow().getCurrentStock())
-                .isEqualTo(55.0);
+                .isEqualTo(80.0);
 
         assertThat(stockRequestController.findAll())
                 .extracting(StockRequestResponse::getId)
                 .contains(created.getId());
 
+        authenticateAs("KASIR");
         assertThatThrownBy(() -> stockRequestController.create(createRequest))
                 .isInstanceOf(AccessDeniedException.class);
     }
@@ -196,7 +198,7 @@ class ManagementWorkflowIntegrationTests {
         request.setIngredientId(ingredient.getId());
         request.setRequestedQuantity(5.0);
 
-        authenticateAs("ADMIN");
+        authenticateAs("MANAGEMENT");
         assertThatThrownBy(() -> stockRequestController.create(request))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Ingredient tidak aktif");

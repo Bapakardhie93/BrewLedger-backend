@@ -29,11 +29,23 @@ public class StockRequestResponse {
 
     private String requestedByName;
 
+    private String requestedByUsername;
+
+    private String requestedByRole;
+
+    private String targetRole;
+
+    private String type;
+
     private LocalDateTime requestedAt;
 
     private String processedByName;
 
+    private String processedByUsername;
+
     private LocalDateTime processedAt;
 
     private LocalDateTime completedAt;
+
+    private String rejectReason;
 }

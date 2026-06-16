@@ -1,6 +1,6 @@
 # BrewLedger API Documentation
 
-Dokumentasi kontrak REST API BrewLedger berdasarkan implementasi backend saat ini.
+Dokumentasi kontrak REST API BrewLedger berdasarkan implementasi backend saat ini. Dokumen ini dirancang lengkap sebagai panduan audit dan integrasi bagi frontend client (macOS/iOS SwiftUI).
 
 ## Konfigurasi Dasar
 
@@ -14,1238 +14,797 @@ Dokumentasi kontrak REST API BrewLedger berdasarkan implementasi backend saat in
 | Format tanggal | `yyyy-MM-dd` |
 | Format waktu | ISO-8601, contoh `2026-06-15T10:30:00` |
 
-Selain login, semua request memerlukan:
+Selain login, semua request memerlukan header berikut:
 
 ```http
 Authorization: Bearer <JWT_TOKEN>
 Content-Type: application/json
 ```
 
-## Ringkasan Endpoint
+---
+
+### Ringkasan Endpoint
 
 | Method | Endpoint | Akses | Fungsi |
 |---|---|---|---|
-| `POST` | `/api/auth/login` | Publik | Login |
-| `GET` | `/api/test` | Login | Tes JWT |
-| `GET` | `/api/pos/catalog` | Kasir/Admin | Katalog POS |
-| `POST` | `/api/pos/checkout` | Kasir/Admin | Checkout POS |
-| `GET` | `/api/warehouse` | Gudang/Admin | Workspace gudang |
-| `PATCH` | `/api/warehouse/ingredients/{id}` | Gudang/Admin | Update ingredient |
-| `POST` | `/api/warehouse/ingredients/{id}/adjust-stock` | Gudang/Admin | Penyesuaian stok |
-| `GET` | `/api/approvals/purchase-orders` | Management/Admin | Daftar approval PO |
-| `POST` | `/api/approvals/purchase-orders/{id}/approve` | Management/Admin | Setujui PO |
-| `POST` | `/api/approvals/purchase-orders/{id}/reject` | Management/Admin | Tolak PO |
-| `GET` | `/api/dashboard` | Management/Admin | Dashboard lengkap |
-| `GET` | `/api/dashboard/best-products` | Management/Admin | Produk terlaris |
-| `GET` | `/api/users` | Admin | Daftar user |
-| `GET` | `/api/users/{id}` | Admin | Detail user |
-| `POST` | `/api/users` | Admin | Buat user |
-| `PUT` | `/api/users/{id}` | Admin | Update user |
-| `DELETE` | `/api/users/{id}` | Admin | Hapus user |
-| `PATCH` | `/api/users/{id}/activate` | Admin | Aktifkan user |
-| `PATCH` | `/api/users/{id}/deactivate` | Admin | Nonaktifkan user |
-| `GET` | `/api/categories` | Management/Admin | Daftar kategori |
-| `POST` | `/api/categories` | Management/Admin | Buat kategori |
+| **Auth** | | | |
+| `POST` | `/api/auth/login` | Publik | Login pengguna |
+| `POST` | `/api/auth/change-password` | Login | Ganti password pengguna |
+| `GET` | `/api/auth/me` | Login | Ambil data profil pengguna yang sedang login |
+| `GET` | `/api/test` | Login | Uji validitas token JWT |
+| **User Presence & Mgmt** | | | |
+| `GET` | `/api/users` | Login | Daftar seluruh user |
+| `GET` | `/api/users/{id}` | Login | Detail user berdasarkan ID |
+| `GET` | `/api/users/online` | Login | Daftar user online (mendukung filter `role`) |
+| `POST` | `/api/users/heartbeat` | Login | Kirim heartbeat kehadiran user (presence tracking) |
+| `POST` | `/api/users` | MANAGEMENT | Buat user baru |
+| `PUT` | `/api/users/{id}` | MANAGEMENT | Perbarui data user |
+| `DELETE` | `/api/users/{id}` | MANAGEMENT | Hapus user |
+| `PATCH` | `/api/users/{id}/activate` | MANAGEMENT | Aktifkan user |
+| `PATCH` | `/api/users/{id}/deactivate` | MANAGEMENT | Nonaktifkan user |
+| **POS / Cashier Shift** | | | |
+| `GET` | `/api/pos/catalog` | KASIR/MANAGEMENT | Katalog POS (dengan kalkulasi order maks) |
+| `GET` | `/api/pos/summary` | KASIR/MANAGEMENT | Ringkasan dashboard kasir (POS Summary) |
+| `POST` | `/api/pos/checkout` | KASIR/MANAGEMENT | Alias Checkout POS |
+| `POST` | `/api/transactions` | KASIR/MANAGEMENT | Checkout POS utama |
+| `GET` | `/api/transactions/my` | KASIR/MANAGEMENT | Daftar transaksi kasir login (History) |
+| `GET` | `/api/transactions` | MANAGEMENT | Daftar semua transaksi |
+| `GET` | `/api/transactions/{id}` | MANAGEMENT/KASIR | Detail transaksi |
+| `POST` | `/api/transactions/{id}/void` | MANAGEMENT | Ajukan void transaksi (membuat ApprovalRequest) |
+| `GET` | `/api/transactions/{id}/receipt` | KASIR/MANAGEMENT | Format struk belanja |
+| `POST` | `/api/cashier-shifts/open` | MANAGEMENT | Buka shift kasir/gudang untuk user target |
+| `POST` | `/api/cashier-shifts/{id}/close` | MANAGEMENT | Tutup shift kasir/gudang untuk user target |
+| `GET` | `/api/cashier-shifts/current` | KASIR, GUDANG, MANAGEMENT | Cek shift aktif milik user login |
+| `GET` | `/api/cashier-shifts` | MANAGEMENT | Daftar semua shift (dengan filter status, role, date) |
+| `GET` | `/api/cashier-shifts/{id}` | MANAGEMENT, pemilik shift | Detail shift |
+| `GET` | `/api/tables` | KASIR/MANAGEMENT | Daftar meja |
+| `GET` | `/api/tables/{id}` | KASIR/MANAGEMENT | Detail meja |
+| `POST` | `/api/tables` | MANAGEMENT | Buat meja baru |
+| `PUT` | `/api/tables/{id}` | MANAGEMENT | Perbarui meja |
+| `PATCH` | `/api/tables/{id}/status` | KASIR/MANAGEMENT | Ubah status meja |
+| `DELETE` | `/api/tables/{id}` | MANAGEMENT | Hapus meja |
+| **Kitchen** | | | |
+| `GET` | `/api/kitchen/orders` | KASIR/MANAGEMENT | Daftar pesanan dapur (mendukung filter `cashier`) |
+| `GET` | `/api/kitchen/orders/{id}` | KASIR/MANAGEMENT | Detail pesanan dapur |
+| `PATCH` | `/api/kitchen/orders/{id}/status` | KASIR/MANAGEMENT | Ubah status pesanan dapur |
+| **Warehouse & Inventory** | | | |
+| `GET` | `/api/warehouse` | MANAGEMENT/GUDANG | Workspace inventori gudang lengkap |
+| `PATCH` | `/api/warehouse/ingredients/{id}` | MANAGEMENT/GUDANG | Perbarui bahan baku gudang |
+| `POST` | `/api/warehouse/ingredients/{id}/adjust-stock` | MANAGEMENT/GUDANG | Ajukan penyesuaian stok |
+| `GET` | `/api/suppliers` | MANAGEMENT/GUDANG | Daftar supplier |
+| `GET` | `/api/suppliers/{id}` | MANAGEMENT/GUDANG | Detail supplier |
+| `POST` | `/api/suppliers` | MANAGEMENT | Buat supplier baru |
+| `PUT` | `/api/suppliers/{id}` | MANAGEMENT | Perbarui supplier |
+| `DELETE` | `/api/suppliers/{id}` | MANAGEMENT | Hapus supplier |
+| `PATCH` | `/api/suppliers/{id}/activate` | MANAGEMENT | Aktifkan supplier |
+| `PATCH` | `/api/suppliers/{id}/deactivate` | MANAGEMENT | Nonaktifkan supplier |
+| `GET` | `/api/ingredients` | MANAGEMENT/GUDANG | Daftar bahan baku |
+| `GET` | `/api/ingredients/search` | MANAGEMENT/GUDANG | Cari bahan baku |
+| `GET` | `/api/ingredients/low-stock` | MANAGEMENT/GUDANG | Daftar bahan baku stok kritis |
+| `GET` | `/api/ingredients/{id}` | MANAGEMENT/GUDANG | Detail bahan baku |
+| `POST` | `/api/ingredients` | MANAGEMENT/GUDANG | Buat bahan baku langsung (bypass approval) |
+| `POST` | `/api/ingredients/submit-new` | MANAGEMENT | Ajukan bahan baku baru (membuat ApprovalRequest) |
+| `PUT` | `/api/ingredients/{id}` | MANAGEMENT/GUDANG | Perbarui data bahan baku |
+| `DELETE` | `/api/ingredients/{id}` | MANAGEMENT | Hapus bahan baku |
+| `PATCH` | `/api/ingredients/{id}/activate` | MANAGEMENT/GUDANG | Aktifkan bahan baku |
+| `PATCH` | `/api/ingredients/{id}/deactivate` | MANAGEMENT/GUDANG | Nonaktifkan bahan baku |
+| `GET` | `/api/product-recipes` | MANAGEMENT/GUDANG | Daftar seluruh resep |
+| `GET` | `/api/product-recipes/product/{productId}` | MANAGEMENT/GUDANG | Resep per produk |
+| `GET` | `/api/product-recipes/{id}` | MANAGEMENT/GUDANG | Detail resep |
+| `POST` | `/api/product-recipes` | MANAGEMENT/GUDANG | Tambah komposisi resep |
+| `PUT` | `/api/product-recipes/{id}` | MANAGEMENT/GUDANG | Perbarui komposisi resep |
+| `DELETE` | `/api/product-recipes/{id}` | MANAGEMENT/GUDANG | Hapus komposisi resep |
+| **Purchase & Stock Request** | | | |
+| `GET` | `/api/purchase-orders` | MANAGEMENT/GUDANG | Daftar PO |
+| `GET` | `/api/purchase-orders/{id}` | MANAGEMENT/GUDANG | Detail PO |
+| `GET` | `/api/purchase-orders/{id}/items` | MANAGEMENT/GUDANG | Daftar item dalam PO |
+| `POST` | `/api/purchase-orders` | MANAGEMENT/GUDANG | Buat PO baru (DRAFT) |
+| `POST` | `/api/purchase-orders/{id}/items` | MANAGEMENT/GUDANG | Tambah item PO |
+| `POST` | `/api/purchase-orders/{id}/submit` | MANAGEMENT/GUDANG | Ajukan approval PO |
+| `POST` | `/api/purchase-orders/{id}/receive` | MANAGEMENT/GUDANG | Penerimaan barang PO (tambah stok) |
+| `POST` | `/api/stock-requests` | MANAGEMENT/GUDANG | Buat pengajuan stock request |
+| `GET` | `/api/stock-requests` | MANAGEMENT/GUDANG | Daftar stock request (mendukung filter `targetRole`) |
+| `PATCH` | `/api/stock-requests/{id}/process` | MANAGEMENT/GUDANG | Proses stock request (status: PROCESSING) |
+| `PATCH` | `/api/stock-requests/{id}/complete` | MANAGEMENT/GUDANG | Selesaikan stock request (status: COMPLETED) |
+| `PATCH` | `/api/stock-requests/{id}/reject` | MANAGEMENT/GUDANG | Tolak stock request (status: REJECTED) |
+| **Centralized Approvals** | | | |
+| `GET` | `/api/approvals` | MANAGEMENT/GUDANG | Daftar approval terpusat (mendukung filter `targetRole`) |
+| `GET` | `/api/approvals/{id}` | MANAGEMENT/GUDANG | Detail pengajuan approval |
+| `POST` | `/api/approvals/{id}/approve` | MANAGEMENT/GUDANG | Setujui pengajuan terpusat |
+| `POST` | `/api/approvals/{id}/reject` | MANAGEMENT/GUDANG | Tolak pengajuan terpusat |
+| **Categories & Products** | | | |
+| `GET` | `/api/categories` | Login | Daftar kategori produk |
+| `POST` | `/api/categories` | MANAGEMENT | Buat kategori |
+| `PUT` | `/api/categories/{id}` | MANAGEMENT | Perbarui kategori |
+| `DELETE` | `/api/categories/{id}` | MANAGEMENT | Hapus kategori |
+| `PATCH` | `/api/categories/{id}/activate` | MANAGEMENT | Aktifkan kategori |
+| `PATCH` | `/api/categories/{id}/deactivate` | MANAGEMENT | Nonaktifkan kategori |
 | `GET` | `/api/products` | Login | Daftar produk |
-| `GET` | `/api/products/search?keyword=` | Login | Cari produk |
-| `POST` | `/api/products` | Management/Admin | Buat produk |
-| `GET` | `/api/suppliers` | Gudang/Management/Admin | Daftar supplier |
-| `POST` | `/api/suppliers` | Management/Admin | Buat supplier |
-| `GET` | `/api/ingredients` | Gudang/Management/Admin | Daftar ingredient |
-| `GET` | `/api/ingredients/search?keyword=` | Gudang/Management/Admin | Cari ingredient |
-| `GET` | `/api/ingredients/low-stock` | Gudang/Management/Admin | Ingredient low stock |
-| `POST` | `/api/ingredients` | Gudang/Admin | Buat ingredient |
-| `GET` | `/api/product-recipes` | Gudang/Management/Admin | Daftar recipe |
-| `GET` | `/api/product-recipes/product/{productId}` | Gudang/Management/Admin | Recipe per produk |
-| `POST` | `/api/product-recipes` | Gudang/Admin | Tambah recipe |
-| `GET` | `/api/purchase-orders` | Gudang/Management/Admin | Daftar PO |
-| `GET` | `/api/purchase-orders/{id}` | Gudang/Management/Admin | Detail PO |
-| `GET` | `/api/purchase-orders/{id}/items` | Gudang/Management/Admin | Item PO |
-| `POST` | `/api/purchase-orders` | Gudang/Admin | Buat PO |
-| `POST` | `/api/purchase-orders/{id}/items` | Gudang/Admin | Tambah item PO |
-| `POST` | `/api/purchase-orders/{id}/receive` | Gudang/Admin | Terima PO |
-| `GET` | `/api/transactions` | Management/Admin | Daftar transaksi |
-| `GET` | `/api/transactions/{id}` | Management/Admin | Detail transaksi |
-| `POST` | `/api/transactions` | Kasir/Admin | Checkout POS |
-| `GET` | `/api/stock-movements` | Gudang/Management/Admin | Audit stok |
-| `GET` | `/api/reports/sales` | Management/Admin | Laporan penjualan |
-| `GET` | `/api/reports/purchases` | Management/Admin | Laporan pembelian |
-| `GET` | `/api/reports/inventory` | Management/Admin | Laporan inventori |
+| `GET` | `/api/products/search` | Login | Cari produk |
+| `POST` | `/api/products` | MANAGEMENT | Buat produk baru beserta resep nested |
+| `PUT` | `/api/products/{id}` | MANAGEMENT | Perbarui produk beserta resep nested |
+| `DELETE` | `/api/products/{id}` | MANAGEMENT | Hapus produk |
+| `PATCH` | `/api/products/{id}/activate` | MANAGEMENT | Aktifkan produk |
+| `PATCH` | `/api/products/{id}/deactivate` | MANAGEMENT | Nonaktifkan produk |
+| **Reports & Audit Trail** | | | |
+| `GET` | `/api/stock-movements` | MANAGEMENT/GUDANG | Audit historis pergerakan stok |
+| `GET` | `/api/reports/sales` | MANAGEMENT | Laporan keuangan & analisa penjualan |
+| `GET` | `/api/reports/sales/csv` | MANAGEMENT | Ekspor CSV laporan penjualan |
+| `GET` | `/api/reports/purchases` | MANAGEMENT | Laporan analisa pembelian (PO) |
+| `GET` | `/api/reports/purchases/csv` | MANAGEMENT | Ekspor CSV laporan pembelian |
+| `GET` | `/api/reports/inventory` | MANAGEMENT | Laporan valuasi inventori |
+| `GET` | `/api/reports/inventory/csv` | MANAGEMENT | Ekspor CSV laporan inventori |
+| `GET` | `/api/activity-logs` | MANAGEMENT | Historis log audit aktivitas sistem |
 
-`Login` pada tabel berarti seluruh role terautentikasi. Endpoint lain mengikuti role yang tertulis dan mengembalikan `403` untuk role yang tidak diizinkan.
+> [!NOTE]
+> `Login` pada tabel berarti seluruh role terautentikasi memiliki akses. Endpoint lain mengikuti role yang tertulis dan mengembalikan `403 Forbidden` untuk role yang tidak diizinkan.
+
+---
 
 ## Error Response
 
-Error aplikasi menggunakan bentuk:
+Seluruh error response bisnis dan validasi dikembalikan dalam format standar:
 
 ```json
 {
   "success": false,
-  "message": "Pesan error"
+  "message": "Pesan error terperinci"
 }
 ```
 
-| Status | Arti |
-|---|---|
-| `400 Bad Request` | Bean validation gagal |
-| `401 Unauthorized` | Login gagal, user nonaktif, token hilang/tidak valid |
-| `403 Forbidden` | Role tidak diizinkan |
-| `404 Not Found` | Resource tidak ditemukan |
-| `422 Unprocessable Entity` | Aturan bisnis gagal |
-| `500 Internal Server Error` | Runtime error yang tidak ditangani secara khusus |
+### HTTP Status Code Map
 
-Response Spring Security untuk token hilang/tidak valid atau akses role dapat berbeda dari format error aplikasi di atas.
+| Status | Deskripsi |
+|---|---|
+| `400 Bad Request` | Gagal validasi data input (Bean validation gagal, atau mismatch userId query dan body). |
+| `401 Unauthorized` | Login gagal, token JWT hilang, kedaluwarsa, atau tidak valid. |
+| `403 Forbidden` | Peran pengguna (role) tidak diizinkan untuk mengakses resource ini. |
+| `404 Not Found` | Resource yang diminta tidak terdaftar di database. |
+| `409 Conflict` | Konflik status pada database (misal memproses data yang sudah selesai, atau target user sudah memiliki shift aktif). |
+| `422 Unprocessable Entity` | Kegagalan aturan bisnis (misal stok kurang, shift kasir belum dibuka, atau pelanggaran validasi harga/cash negatif). |
+| `500 Internal Server Error` | Terjadi kesalahan sistem internal di backend. |
+
+---
 
 ## 1. Authentication
 
-### Login
+### Login Pengguna
+Mengeluarkan token JWT baru jika username dan password cocok.
 
 ```http
 POST /api/auth/login
+Content-Type: application/json
 ```
 
-Request:
-
+#### Request:
 ```json
 {
-  "username": "admin",
-  "password": "change-this-admin-password"
+  "username": "satriyadm9311",
+  "password": "my-secret-password"
 }
 ```
 
-Validasi:
-
-- `username`: wajib.
-- `password`: wajib.
-- User harus aktif.
-
-Response `200 OK`:
-
+#### Response `200 OK`:
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiJ9...",
-  "username": "admin",
-  "role": "ADMIN"
+  "token": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJzYXRyaXlhZG05MzExIiwi...",
+  "username": "satriyadm9311",
+  "role": "MANAGEMENT"
 }
 ```
 
-Token memiliki subject berupa username dan claim `role`. Response tidak memiliki field `type`; gunakan prefix `Bearer` saat mengirim token.
-
-Contoh:
-
-```bash
-TOKEN=$(curl -s -X POST http://localhost:8081/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"change-this-admin-password"}' \
-  | jq -r '.token')
-```
-
-### Tes Token
+### Ambil Data Profil Login (Current User)
+Mendapatkan info user yang sedang aktif berdasarkan header JWT.
 
 ```http
-GET /api/test
+GET /api/auth/me
+Authorization: Bearer <JWT_TOKEN>
 ```
 
-Response:
-
-```text
-JWT BERHASIL
-```
-
-## API Berdasarkan Role
-
-| Role | Endpoint utama | Kegunaan |
-|---|---|---|
-| `ADMIN` | Semua endpoint role-specific | Administrasi dan supervisi |
-| `MANAGEMENT` | `/api/dashboard`, `/api/approvals/**`, `/api/reports/**` | Dashboard, approval, laporan |
-| `KASIR` | `/api/pos/**` | Katalog dan checkout POS |
-| `GUDANG` | `/api/warehouse/**`, endpoint PO operasional | Inventori, recipe, movement, request PO |
-
-### Workspace Kasir
-
-```http
-GET /api/pos/catalog?keyword=caramel
-```
-
-Pencarian mencocokkan nama atau kode/SKU produk.
-
-Response:
-
+#### Response `200 OK`:
 ```json
 {
-  "cashierName": "Kasir Pagi",
-  "taxRate": 0.11,
-  "paymentMethods": ["CASH", "QRIS", "CARD"],
-  "products": [
-    {
-      "id": 1,
-      "code": "BEV-001",
-      "name": "Caramel Macchiato",
-      "categoryName": "Coffee",
-      "sellingPrice": 35000.0,
-      "available": true,
-      "maximumOrderQuantity": 12
-    }
-  ]
-}
-```
-
-`maximumOrderQuantity` dihitung dari stok ingredient dan recipe. Nilainya `null` untuk produk tanpa recipe. Frontend wajib memakai `taxRate` dari response; backend saat ini menghitung pajak 11%.
-
-Checkout:
-
-```http
-POST /api/pos/checkout
-```
-
-Payload dan response sama dengan [Checkout Transaction / POS](#checkout). Metode pembayaran menerima `CASH`, `QRIS`, dan `CARD`.
-
-### Workspace Gudang
-
-```http
-GET /api/warehouse?keyword=susu
-```
-
-Satu request menyediakan seluruh kartu dan tab pada layar gudang:
-
-```json
-{
-  "generatedAt": "2026-06-15T12:30:00",
-  "totalIngredients": 7,
-  "totalStock": 18300.0,
-  "lowStockCount": 0,
-  "requestApprovalCount": 1,
-  "inventory": [
-    {
-      "id": 1,
-      "code": "ING-001",
-      "name": "Susu",
-      "unit": "ml",
-      "currentStock": 5000.0,
-      "minimumStock": 2000.0,
-      "costPrice": 15000.0,
-      "supplierName": "Supplier Susu",
-      "stockStatus": "SAFE",
-      "active": true
-    }
-  ],
-  "productComposition": [
-    {
-      "recipeId": 1,
-      "productId": 1,
-      "productCode": "BEV-001",
-      "productName": "Caramel Macchiato",
-      "ingredientId": 1,
-      "ingredientName": "Susu",
-      "ingredientUnit": "ml",
-      "quantityRequired": 150.0
-    }
-  ],
-  "stockMovements": [],
-  "approvalRequests": []
-}
-```
-
-Pemetaan tab:
-
-| Tab/kartu | Field |
-|---|---|
-| Total bahan baku | `totalIngredients` |
-| Total stok | `totalStock` |
-| Stok rendah | `lowStockCount` |
-| Request approval | `requestApprovalCount` |
-| Inventori bahan baku | `inventory` |
-| Komposisi produk | `productComposition` |
-| Riwayat pergerakan | `stockMovements` |
-| Request approval | `approvalRequests` |
-
-Update master ingredient:
-
-```http
-PATCH /api/warehouse/ingredients/{id}
-```
-
-```json
-{
-  "name": "Susu",
-  "supplierId": 1,
-  "unit": "ml",
-  "minimumStock": 2000,
-  "costPrice": 15000,
-  "active": true
-}
-```
-
-Penyesuaian stok manual:
-
-```http
-POST /api/warehouse/ingredients/{id}/adjust-stock
-```
-
-```json
-{
-  "newStock": 5100,
-  "reason": "Hasil stock opname"
-}
-```
-
-Penyesuaian membuat movement `ADJUSTMENT_IN` atau `ADJUSTMENT_OUT`.
-
-### Workflow Approval PO
-
-```text
-DRAFT -> PENDING_APPROVAL -> APPROVED -> RECEIVED
-                         \-> REJECTED -> PENDING_APPROVAL
-```
-
-Gudang mengajukan PO:
-
-```http
-POST /api/purchase-orders/{id}/submit
-```
-
-Management mengambil daftar pengajuan:
-
-```http
-GET /api/approvals/purchase-orders
-```
-
-Setujui:
-
-```http
-POST /api/approvals/purchase-orders/{id}/approve
-```
-
-Tolak:
-
-```http
-POST /api/approvals/purchase-orders/{id}/reject
-```
-
-```json
-{
-  "reason": "Harga perlu dinegosiasi ulang"
-}
-```
-
-## 2. Dashboard
-
-### Dashboard Lengkap
-
-```http
-GET /api/dashboard
-```
-
-Response `200 OK`:
-
-```json
-{
-  "generatedAt": "2026-06-15T12:18:00",
-  "todaySales": 95000.0,
-  "salesChangePercentage": 5.56,
-  "todayTransactions": 1,
-  "transactionChangePercentage": 0.0,
-  "criticalStockCount": 1,
-  "pendingApprovalCount": 2,
-  "activeUsers": 3,
-  "totalProducts": 24,
-  "totalIngredients": 50,
-  "totalSuppliers": 5,
-  "totalTransactions": 128,
-  "totalSales": 5625000.0,
-  "totalStockMovements": 256,
-  "topSellingProducts": [
-    {
-      "productName": "Cafe Latte",
-      "quantitySold": 42,
-      "revenue": 1260000.0
-    }
-  ],
-  "recentStockMovements": [
-    {
-      "productName": "Fresh Milk",
-      "ingredientName": "Fresh Milk",
-      "type": "OUT",
-      "quantity": 150.0
-    }
-  ],
-  "recentTransactions": [
-    {
-      "id": 128,
-      "invoiceNumber": "TRX-1781519400000",
-      "customerName": "Meja 4",
-      "cashierName": "Kasir Pagi",
-      "transactionDate": "2026-06-15T12:09:00",
-      "total": 95000.0,
-      "status": "PAID",
-      "transactionType": "DINE_IN",
-      "paymentMethod": "QRIS"
-    }
-  ],
-  "topMovingIngredients": [
-    {
-      "ingredientName": "Fresh Milk",
-      "totalQuantityIn": 10000.0,
-      "totalQuantityOut": 4500.0,
-      "totalQuantityMoved": 14500.0,
-      "movementCount": 31
-    }
-  ],
-  "lastSevenDays": [
-    {
-      "date": "2026-06-09",
-      "dayLabel": "Sen",
-      "sales": 1450000.0,
-      "transactionCount": 45
-    }
-  ],
-  "salesByCategory": [
-    {
-      "categoryName": "Kopi",
-      "quantitySold": 74,
-      "revenue": 2220000.0,
-      "percentage": 74.0
-    },
-    {
-      "categoryName": "Non-Kopi",
-      "quantitySold": 26,
-      "revenue": 780000.0,
-      "percentage": 26.0
-    }
-  ],
-  "criticalStocks": [
-    {
-      "ingredientId": 7,
-      "code": "ING-007",
-      "name": "Fresh Milk",
-      "unit": "ml",
-      "currentStock": 500.0,
-      "minimumStock": 1000.0,
-      "shortage": 500.0
-    }
-  ]
-}
-```
-
-Catatan:
-
-- `todaySales` dan `todayTransactions` hanya menghitung transaksi `PAID`.
-- Persentase membandingkan hari ini dengan kemarin. Jika kemarin nol dan hari ini lebih dari nol, hasilnya `100.0`.
-- `pendingApprovalCount` adalah jumlah purchase order berstatus `PENDING_APPROVAL`.
-- `activeUsers` menghitung user dengan `active=true`.
-- `lastSevenDays` selalu berisi tujuh tanggal termasuk hari ini.
-- `salesByCategory` dihitung dari transaksi `PAID` selama tujuh hari terakhir.
-- `criticalStocks` menggunakan kondisi `currentStock <= minimumStock`.
-- Transaksi baru menyimpan user login sebagai kasir. Data lama tanpa kasir menggunakan `Tidak diketahui`.
-- `topSellingProducts`, `recentStockMovements`, dan `topMovingIngredients` dibatasi lima data.
-- `recentTransactions` dibatasi delapan data.
-- `recentStockMovements.productName` dipertahankan untuk kompatibilitas. Client baru sebaiknya memakai `ingredientName`.
-- `recentTransactions.customerName` berasal dari `notes`; jika kosong nilainya `Umum`.
-- `totalSales` adalah total seluruh transaksi, tidak dibatasi tanggal.
-
-Pemetaan ke dashboard frontend:
-
-| Komponen | Field |
-|---|---|
-| Penjualan hari ini | `todaySales` |
-| Perubahan penjualan | `salesChangePercentage` |
-| Transaksi hari ini | `todayTransactions` |
-| Perubahan transaksi | `transactionChangePercentage` |
-| Stok kritis | `criticalStockCount`, `criticalStocks` |
-| Pending approval | `pendingApprovalCount` |
-| Total pendapatan | `totalSales` |
-| Total transaksi | `totalTransactions` |
-| Total pengguna aktif | `activeUsers` |
-| Tren penjualan | `lastSevenDays[].sales` |
-| Volume transaksi | `lastSevenDays[].transactionCount` |
-| Diagram kategori | `salesByCategory` |
-| Produk terlaris | `topSellingProducts` |
-| Transaksi terbaru | `recentTransactions` |
-
-### Produk Terlaris
-
-```http
-GET /api/dashboard/best-products?limit=5
-```
-
-Query:
-
-| Parameter | Wajib | Default | Keterangan |
-|---|---:|---:|---|
-| `limit` | Tidak | `5` | Jumlah hasil |
-
-Response:
-
-```json
-[
-  {
-    "productName": "Cafe Latte",
-    "quantitySold": 42,
-    "revenue": 1260000.0
-  }
-]
-```
-
-## 3. User Management
-
-Semua endpoint pada bagian ini membutuhkan role `ADMIN`.
-
-Role yang dibuat saat startup:
-
-- `ADMIN`
-- `MANAGEMENT`
-- `GUDANG`
-- `KASIR`
-
-Belum tersedia endpoint daftar role. ID role mengikuti data database.
-
-### Daftar User
-
-```http
-GET /api/users
-```
-
-Response:
-
-```json
-[
-  {
+  "id": 1,
+  "fullName": "Satriya Dwi Mahardhika",
+  "username": "satriyadm9311",
+  "active": true,
+  "mustChangePassword": false,
+  "lastLogin": "2026-06-15T23:09:00",
+  "phoneNumber": "08123456789",
+  "lastActivity": "2026-06-16T23:05:12",
+  "isOnline": true,
+  "role": {
     "id": 1,
-    "fullName": "BrewLedger Administrator",
-    "username": "admin",
+    "name": "MANAGEMENT",
+    "description": "Pengelolaan penuh sistem, bisnis, user, dan laporan"
+  }
+}
+```
+
+### Ganti Password
+Mengubah password user yang sedang login.
+
+```http
+POST /api/auth/change-password
+Authorization: Bearer <JWT_TOKEN>
+Content-Type: application/json
+```
+
+#### Request:
+```json
+{
+  "oldPassword": "temporary-password",
+  "newPassword": "newSecretPassword123"
+}
+```
+
+#### Response `200 OK` (atau melempar `422` jika password lama salah):
+*(No body)*
+
+---
+
+## 2. User Presence & Management
+
+### Send Heartbeat (Presence Tracking)
+Digunakan oleh frontend client untuk memperbarui status aktif secara real-time.
+
+```http
+POST /api/users/heartbeat
+Authorization: Bearer <JWT_TOKEN>
+```
+
+* **Rekomendasi Frontend**: Kirim heartbeat request setiap **1 menit** sekali menggunakan timer latar belakang.
+* **Logika Status Online**: User dinilai online (`isOnline: true`) jika `lastActivity` terdeteksi dalam **5 menit terakhir** sejak saat ini.
+
+### Daftar User Online
+Mendapatkan user yang status aktivitasnya masih aktif (online), opsional difilter berdasarkan nama role.
+
+```http
+GET /api/users/online?role=GUDANG
+Authorization: Bearer <JWT_TOKEN>
+```
+
+#### Response `200 OK`:
+```json
+[
+  {
+    "id": 5,
+    "fullName": "Budi Gudang",
+    "username": "gudang_budi",
     "active": true,
-    "mustChangePassword": true,
-    "lastLogin": "2026-06-15T10:30:00",
+    "mustChangePassword": false,
+    "lastLogin": "2026-06-16T22:00:00",
+    "phoneNumber": "08129999999",
+    "lastActivity": "2026-06-16T23:10:00",
+    "isOnline": true,
     "role": {
-      "id": 1,
-      "name": "ADMIN",
-      "description": "Administrator sistem"
+      "id": 2,
+      "name": "GUDANG",
+      "description": "Warehouse"
     }
   }
 ]
 ```
 
-### Detail User
-
-```http
-GET /api/users/{id}
-```
-
-Response menggunakan bentuk user yang sama seperti daftar user.
-
-### Buat User
+### CRUD User (Hanya MANAGEMENT)
+Mutasi user seperti membuat, mengubah, menghapus, mengaktifkan, dan menonaktifkan dibatasi hanya untuk role `MANAGEMENT`.
 
 ```http
 POST /api/users
+Authorization: Bearer <JWT_TOKEN>
 ```
-
-Request:
-
+#### Request:
 ```json
 {
-  "fullName": "Kasir Pagi",
-  "username": "kasir.pagi",
+  "fullName": "Jane Kasir",
+  "username": "jane.kasir",
   "password": "temporary-password",
-  "roleId": 4
+  "roleId": 3,
+  "phoneNumber": "08122334455"
 }
 ```
 
-Validasi: seluruh field wajib. User baru otomatis aktif dan memiliki `mustChangePassword=true`.
+---
 
-Response: `201 Created` dengan object user.
+## 3. Product & Composition
 
-### Update User
+Setiap penambahan atau pembaruan produk dapat menyertakan komposisi resep bahan baku langsung di dalam satu form payload (nested composition).
 
-```http
-PUT /api/users/{id}
-```
-
-Request:
-
-```json
-{
-  "fullName": "Kasir Shift Pagi",
-  "username": "kasir.pagi",
-  "password": "",
-  "roleId": 4
-}
-```
-
-`password` opsional. Nilai null, kosong, atau hanya spasi tidak mengubah password lama.
-
-### Hapus User
-
-```http
-DELETE /api/users/{id}
-```
-
-Response: `200 OK` tanpa body.
-
-### Aktifkan User
-
-```http
-PATCH /api/users/{id}/activate
-```
-
-Response: `200 OK` tanpa body.
-
-### Nonaktifkan User
-
-```http
-PATCH /api/users/{id}/deactivate
-```
-
-Response: `200 OK` tanpa body. User nonaktif tidak dapat login lagi.
-
-## 4. Product Category
-
-### Daftar Kategori
-
-```http
-GET /api/categories
-```
-
-Response:
-
-```json
-[
-  {
-    "id": 1,
-    "name": "Coffee",
-    "description": "Minuman berbasis kopi",
-    "active": true
-  }
-]
-```
-
-### Buat Kategori
-
-```http
-POST /api/categories
-```
-
-Request:
-
-```json
-{
-  "name": "Coffee",
-  "description": "Minuman berbasis kopi"
-}
-```
-
-`name` wajib dan unik.
-
-## 5. Product
-
-### Daftar Produk
-
-```http
-GET /api/products
-```
-
-Response:
-
-```json
-[
-  {
-    "id": 1,
-    "code": "PRD-001",
-    "name": "Cafe Latte",
-    "categoryName": "Coffee",
-    "sellingPrice": 30000.0,
-    "description": "Espresso dan susu",
-    "active": true
-  }
-]
-```
-
-### Cari Produk
-
-```http
-GET /api/products/search?keyword=latte
-```
-
-Pencarian dilakukan terhadap nama, case-insensitive, dengan partial match.
-
-### Buat Produk
-
+### Buat Produk Baru beserta Resep
 ```http
 POST /api/products
+Authorization: Bearer <JWT_TOKEN>
+Content-Type: application/json
 ```
 
-Request:
-
+#### Request:
+* `useCustomHpp`: Jika `true`, maka HPP produk diset manual lewat nilai `customHpp`. Jika `false`, HPP dihitung otomatis dari komposisi bahan baku (`calculatedHpp`).
+* `margin`: Margin keuntungan target (%).
 ```json
 {
-  "code": "PRD-001",
-  "name": "Cafe Latte",
-  "categoryId": 1,
-  "sellingPrice": 30000,
-  "description": "Espresso dan susu"
-}
-```
-
-Validasi:
-
-- `code`: wajib dan unik.
-- `name`: wajib.
-- `categoryId`: wajib dan harus ada.
-- `sellingPrice`: wajib dan lebih dari nol.
-- `description`: opsional.
-
-## 6. Supplier
-
-### Daftar Supplier
-
-```http
-GET /api/suppliers
-```
-
-Response:
-
-```json
-[
-  {
-    "id": 1,
-    "name": "PT Biji Kopi",
-    "contactPerson": "Budi",
-    "phone": "08123456789",
-    "email": "sales@example.com",
-    "address": "Jakarta",
-    "active": true
-  }
-]
-```
-
-### Buat Supplier
-
-```http
-POST /api/suppliers
-```
-
-Request:
-
-```json
-{
-  "name": "PT Biji Kopi",
-  "contactPerson": "Budi",
-  "phone": "08123456789",
-  "email": "sales@example.com",
-  "address": "Jakarta"
-}
-```
-
-Hanya `name` yang wajib. Nama supplier harus unik sesuai pemeriksaan service.
-
-## 7. Ingredient
-
-### Daftar Ingredient
-
-```http
-GET /api/ingredients
-```
-
-Response:
-
-```json
-[
-  {
-    "id": 1,
-    "code": "ING-001",
-    "name": "Arabica Bean",
-    "supplierName": "PT Biji Kopi",
-    "unit": "gram",
-    "currentStock": 5000.0,
-    "minimumStock": 1000.0,
-    "costPrice": 150.0,
-    "active": true
-  }
-]
-```
-
-### Cari Ingredient
-
-```http
-GET /api/ingredients/search?keyword=arabica
-```
-
-Pencarian dilakukan terhadap nama, case-insensitive, dengan partial match.
-
-### Low Stock
-
-```http
-GET /api/ingredients/low-stock
-```
-
-Response:
-
-```json
-[
-  {
-    "id": 1,
-    "code": "ING-001",
-    "name": "Arabica Bean",
-    "currentStock": 800.0,
-    "minimumStock": 1000.0
-  }
-]
-```
-
-Kondisi low stock adalah `currentStock <= minimumStock`.
-
-### Buat Ingredient
-
-```http
-POST /api/ingredients
-```
-
-Request:
-
-```json
-{
-  "code": "ING-001",
-  "name": "Arabica Bean",
-  "supplierId": 1,
-  "unit": "gram",
-  "minimumStock": 1000,
-  "costPrice": 150
-}
-```
-
-Validasi:
-
-- `code`, `name`, dan `unit`: wajib.
-- `code`: unik.
-- `supplierId`: wajib dan harus ada.
-- `minimumStock` dan `costPrice`: wajib, minimal nol.
-
-`currentStock` tidak diterima dari request dan selalu dimulai dari `0.0`. Stok ditambah melalui penerimaan PO.
-
-## 8. Product Recipe
-
-### Daftar Semua Recipe
-
-```http
-GET /api/product-recipes
-```
-
-### Recipe Berdasarkan Produk
-
-```http
-GET /api/product-recipes/product/{productId}
-```
-
-Response:
-
-```json
-[
-  {
-    "id": 1,
-    "productName": "Cafe Latte",
-    "ingredientName": "Arabica Bean",
-    "quantityRequired": 18.0
-  },
-  {
-    "id": 2,
-    "productName": "Cafe Latte",
-    "ingredientName": "Fresh Milk",
-    "quantityRequired": 150.0
-  }
-]
-```
-
-### Tambah Recipe
-
-```http
-POST /api/product-recipes
-```
-
-Request:
-
-```json
-{
-  "productId": 1,
-  "ingredientId": 1,
-  "quantityRequired": 18
-}
-```
-
-Pasangan produk dan ingredient harus unik. `quantityRequired` wajib lebih dari nol.
-
-## 9. Purchase Order
-
-### Buat PO
-
-```http
-POST /api/purchase-orders
-```
-
-Request:
-
-```json
-{
-  "supplierId": 1,
-  "notes": "Restock mingguan"
-}
-```
-
-Response:
-
-```json
-{
-  "id": 1,
-  "poNumber": "PO-1781519400000",
-  "supplierName": "PT Biji Kopi",
-  "orderDate": "2026-06-15",
-  "status": "DRAFT",
-  "notes": "Restock mingguan"
-}
-```
-
-`orderDate` dibuat oleh server dan tidak diterima dari request.
-
-### Daftar PO
-
-```http
-GET /api/purchase-orders
-```
-
-Response berupa array object PO seperti response create.
-
-### Detail PO
-
-```http
-GET /api/purchase-orders/{id}
-```
-
-Response:
-
-```json
-{
-  "id": 1,
-  "poNumber": "PO-1781519400000",
-  "supplierName": "PT Biji Kopi",
-  "orderDate": "2026-06-15",
-  "status": "DRAFT",
-  "notes": "Restock mingguan",
-  "items": [
+  "code": "PROD-MATCHA",
+  "name": "Matcha Latte",
+  "categoryId": 2,
+  "sellingPrice": 25000.0,
+  "description": "Matcha Drink dengan Susu UHT",
+  "useCustomHpp": false,
+  "customHpp": 0.0,
+  "margin": 50.0,
+  "recipeItems": [
     {
-      "id": 1,
-      "ingredientName": "Arabica Bean",
-      "quantity": 5000.0,
-      "unitPrice": 150.0,
-      "subtotal": 750000.0
-    }
-  ]
-}
-```
-
-### Daftar Item PO
-
-```http
-GET /api/purchase-orders/{id}/items
-```
-
-Response hanya berupa array `items` seperti pada detail PO.
-
-### Tambah Item PO
-
-```http
-POST /api/purchase-orders/{id}/items
-```
-
-Request:
-
-```json
-{
-  "ingredientId": 1,
-  "quantity": 5000,
-  "unitPrice": 150
-}
-```
-
-`quantity` dan `unitPrice` wajib lebih dari nol. Item hanya dapat ditambahkan ketika PO berstatus `DRAFT`.
-
-### Terima PO
-
-```http
-POST /api/purchase-orders/{id}/receive
-```
-
-Tidak memiliki request body.
-
-Efek:
-
-1. Memastikan PO sudah berstatus `APPROVED`.
-2. Memastikan PO memiliki item.
-3. Menambah stok setiap ingredient.
-4. Membuat stock movement `PURCHASE`.
-5. Mengubah status PO menjadi `RECEIVED`.
-
-Response adalah object PO setelah status berubah.
-
-## 10. Transaction / POS
-
-### Checkout
-
-```http
-POST /api/transactions
-```
-
-Request:
-
-```json
-{
-  "transactionType": "DINE_IN",
-  "paymentMethod": "QRIS",
-  "notes": "Meja 4",
-  "items": [
-    {
-      "productId": 1,
-      "quantity": 1
+      "ingredientId": 4,
+      "quantityRequired": 100.0
     },
     {
-      "productId": 2,
-      "quantity": 2
+      "ingredientId": 5,
+      "quantityRequired": 12.0
     }
   ]
 }
 ```
 
-Nilai yang diterima:
-
-- `transactionType`: `DINE_IN`, `TAKE_AWAY`.
-- `paymentMethod`: `CASH`, `QRIS`, `CARD`.
-- `items`: minimal satu item.
-- `items[].productId`: wajib dan harus ada.
-- `items[].quantity`: bilangan bulat lebih dari nol.
-
-Response:
-
+#### Response `201 Created`:
+* `calculatedHpp`: Jumlah total HPP dinamis dari komposisi bahan baku.
+* `hpp`: HPP aktif produk (dapat diset manual atau otomatis).
+* `recommendedSellingPrice`: Rekomendasi harga jual produk yang dihitung dengan rumus:
+  $$\text{Recommended Selling Price} = \frac{\text{HPP}}{1 - \frac{\text{margin}}{100}}$$
 ```json
 {
-  "id": 1,
-  "transactionNumber": "TRX-1781519400000",
-  "subtotal": 30000.0,
-  "tax": 3300.0,
-  "total": 33300.0,
-  "items": [
+  "id": 10,
+  "code": "PROD-MATCHA",
+  "name": "Matcha Latte",
+  "categoryName": "Non-Kopi",
+  "sellingPrice": 25000.0,
+  "description": "Matcha Drink dengan Susu UHT",
+  "active": true,
+  "useCustomHpp": false,
+  "customHpp": 0.0,
+  "calculatedHpp": 10080.0,
+  "hpp": 10080.0,
+  "margin": 50.0,
+  "recommendedSellingPrice": 20160.0,
+  "recipeItems": [
     {
-      "productId": 1,
-      "productName": "Cafe Latte",
-      "quantity": 1,
-      "unitPrice": 30000.0,
-      "subtotal": 30000.0
+      "id": 15,
+      "productName": "Matcha Latte",
+      "ingredientName": "Susu UHT",
+      "quantityRequired": 100.0
+    },
+    {
+      "id": 16,
+      "productName": "Matcha Latte",
+      "ingredientName": "Bubuk Matcha",
+      "quantityRequired": 12.0
     }
   ]
 }
 ```
 
-Aturan bisnis:
+---
 
-- Harga diambil dari produk pada saat checkout.
-- Pajak dihitung `subtotal * 0.11`.
-- Payment status otomatis `PAID`.
-- Ingredient dikurangi berdasarkan `quantityRequired * quantity`.
-- Stock movement `SALE` dibuat per recipe.
-- Seluruh proses atomic dan di-rollback jika salah satu stok tidak cukup.
-- Request tidak menerima `customerName`, `amountPaid`, diskon, atau kembalian.
+## 4. Bahan Baku & Perhitungan HPP
 
-Contoh error stok `422`:
+### Validasi Angka Input
+Saat membuat atau mengubah bahan baku (`Ingredient`), backend menerapkan validasi angka ketat:
+1. `purchasePrice` tidak boleh negatif.
+2. `costPrice` tidak boleh negatif.
+3. `packSize` harus bernilai positif (`> 0.0`) jika `purchasePrice` disediakan.
 
+Kegagalan aturan ini memicu error `422 Unprocessable Entity` dengan pesan validasi numerik.
+
+### Rumus Perhitungan Biaya Bahan Baku Per Unit
+Jika `purchasePrice` (harga pembelian bulk) dan `packSize` (isi kemasan pack) diisi, backend menghitung `costPrice` secara otomatis:
+$$\text{costPrice} = \frac{\text{purchasePrice}}{\text{packSize}}$$
+*Contoh: Pembelian Susu UHT Rp24.000 dengan kemasan 1000ml menghasilkan unit cost Rp24/ml.*
+
+---
+
+## 5. POS Checkout, Shift & History
+
+### Buka Shift Kasir/Gudang oleh Manajemen
+Membuka shift kerja untuk user operasional target. Hanya dapat dipicu oleh role `MANAGEMENT`. `KASIR` dan `GUDANG` tidak boleh membuka shift-nya sendiri.
+
+```http
+POST /api/cashier-shifts/open?userId=3
+Authorization: Bearer <JWT_TOKEN_MANAGEMENT>
+Content-Type: application/json
+```
+
+* **Query & Body parameter**: Backend menerima `userId` dari query param maupun request body. Jika keduanya diisi, nilainya harus sama (mismatch menghasilkan `400 Bad Request`).
+* **Validasi**: Target user ID wajib mengarah ke user aktif. Peran target user hanya boleh `KASIR` atau `GUDANG`. User target tidak boleh memiliki shift aktif (OPEN) yang belum ditutup (memicu `409 Conflict`). Nilai `openingCash` tidak boleh negatif (memicu `422`). Jika target role `GUDANG`, `openingCash` diperbolehkan bernilai `0.0`.
+
+#### Request Body:
 ```json
 {
-  "success": false,
-  "message": "Stok tidak cukup untuk bahan: Fresh Milk. Tersedia: 100.0, Dibutuhkan: 150.0"
+  "userId": 3,
+  "openingCash": 100000.0,
+  "notes": "Shift pagi kasir outlet"
 }
 ```
 
-### Daftar Transaksi
-
-```http
-GET /api/transactions
+#### Response `201 Created` / `200 OK`:
+```json
+{
+  "id": 12,
+  "cashierId": 3,
+  "cashierName": "Jane Kasir",
+  "cashierUsername": "jane.kasir",
+  "cashierRole": "KASIR",
+  "openingCash": 100000.0,
+  "closingCash": null,
+  "expectedCash": null,
+  "cashDifference": null,
+  "openedAt": "2026-06-16T09:00:00",
+  "closedAt": null,
+  "status": "OPEN",
+  "notes": "Shift pagi kasir outlet"
+}
 ```
 
-Response berupa array transaction beserta item.
-
-### Detail Transaksi
-
-```http
-GET /api/transactions/{id}
-```
-
-Response menggunakan bentuk yang sama dengan response checkout.
-
-## 11. Stock Movement
-
-### Daftar Pergerakan Stok
+### Tutup Shift Kerja oleh Manajemen
+Menutup shift kerja target user. Hanya dapat diakses oleh role `MANAGEMENT`.
 
 ```http
-GET /api/stock-movements
+POST /api/cashier-shifts/{id}/close
+Authorization: Bearer <JWT_TOKEN_MANAGEMENT>
+Content-Type: application/json
 ```
 
-Response:
+* **Validasi**: Hanya untuk role `MANAGEMENT`. Shift harus ada dan statusnya wajib masih `OPEN`. Nilai `closingCash` tidak boleh negatif.
+* **Kalkulasi**: Backend menghitung secara otomatis:
+  * `expectedCash` = `openingCash` + `totalCashTransactionsDuringShift`
+  * `cashDifference` = `closingCash` - `expectedCash`
 
+#### Request Body:
+```json
+{
+  "closingCash": 250000.0,
+  "notes": "Shift ditutup oleh supervisor"
+}
+```
+
+#### Response `200 OK`:
+```json
+{
+  "id": 12,
+  "cashierId": 3,
+  "cashierName": "Jane Kasir",
+  "cashierUsername": "jane.kasir",
+  "cashierRole": "KASIR",
+  "openingCash": 100000.0,
+  "closingCash": 250000.0,
+  "expectedCash": 240000.0,
+  "cashDifference": 10000.0,
+  "openedAt": "2026-06-16T09:00:00",
+  "closedAt": "2026-06-16T17:00:00",
+  "status": "CLOSED",
+  "notes": "Shift ditutup oleh supervisor"
+}
+```
+
+### Cek Shift Aktif Pengguna Login (Current Shift)
+Mengecek status shift aktif milik pengguna yang sedang login. Digunakan oleh POS untuk validasi sebelum melayani transaksi.
+
+```http
+GET /api/cashier-shifts/current
+Authorization: Bearer <JWT_TOKEN>
+```
+
+* **Response**:
+  * `200 OK` dengan detail shift jika ada shift aktif (OPEN).
+  * `204 No Content` jika tidak ada shift aktif (menyatakan status "belum aktif").
+
+### Daftar Semua Shift (List All)
+Mendapatkan semua riwayat shift kasir/gudang. Hanya diizinkan bagi role `MANAGEMENT`.
+
+```http
+GET /api/cashier-shifts?status=OPEN&role=KASIR&date=2026-06-16
+Authorization: Bearer <JWT_TOKEN_MANAGEMENT>
+```
+* **Query parameters (Opsional)**: `status` (OPEN/CLOSED), `role` (KASIR/GUDANG), `date` (format `yyyy-MM-dd` mencocokkan tanggal pembukaan).
+
+### Detail Shift Kerja
+Mendapatkan rincian shift berdasarkan ID.
+
+```http
+GET /api/cashier-shifts/{id}
+Authorization: Bearer <JWT_TOKEN>
+```
+* **Akses**: Diizinkan bagi role `MANAGEMENT` atau pemilik shift bersangkutan (`pemilik shift`). Jika peran lain mencoba mengakses milik user lain, mengembalikan `403 Forbidden`.
+
+### Ringkasan Kasir (POS Summary)
+Mendapatkan statistik ringkas kasir untuk tampilan dashboard POS.
+
+```http
+GET /api/pos/summary
+Authorization: Bearer <JWT_TOKEN>
+```
+
+#### Response `200 OK`:
+```json
+{
+  "shiftActive": true,
+  "activeShiftId": 1,
+  "todaySalesCount": 1,
+  "todaySalesAmount": 16650.0,
+  "pendingKitchenOrdersCount": 0
+}
+```
+
+### Riwayat Transaksi Pribadi (My History)
+Mendapatkan daftar transaksi kasir yang sedang login.
+
+```http
+GET /api/transactions/my
+Authorization: Bearer <JWT_TOKEN>
+```
+
+#### Response `200 OK`:
+*(Mengembalikan array list `TransactionResponse` diurutkan dari yang paling baru).*
+
+---
+
+## 6. Kitchen Order (Pesanan Dapur)
+
+Merekam pesanan makanan/minuman yang dikirim ke layar dapur secara otomatis setelah transaksi selesai.
+
+### Daftar Pesanan Dapur
+Mendukung filter query parameter `cashier` untuk melihat pesanan yang diinput kasir tertentu atau kasir yang sedang aktif login (`current`).
+
+```http
+GET /api/kitchen/orders?cashier=current
+Authorization: Bearer <JWT_TOKEN>
+```
+
+#### Response `200 OK`:
 ```json
 [
   {
     "id": 1,
-    "ingredientName": "Arabica Bean",
-    "movementType": "PURCHASE",
-    "quantity": 5000.0,
-    "stockBefore": 0.0,
-    "stockAfter": 5000.0,
-    "referenceNumber": "PO-1781519400000",
-    "movementDate": "2026-06-15T10:30:00"
+    "transactionId": 4,
+    "transactionNumber": "TRX-1781626216791",
+    "tableNumber": "12",
+    "status": "WAITING",
+    "notes": "Dine In Meja 12",
+    "createdAt": "2026-06-16T23:10:15",
+    "items": [
+      {
+        "id": 1,
+        "productName": "Espresso",
+        "quantity": 2,
+        "notes": "Less sugar"
+      }
+    ]
   }
 ]
 ```
 
-`movementType` yang dibuat sistem saat ini adalah `PURCHASE` dan `SALE`.
+---
 
-## 12. Reports
+## 7. Stock Request
 
-### Laporan Penjualan
+Digunakan untuk mengajukan permintaan bahan baku antar departemen (outlet/bar ke gudang utama).
 
+### Buat Stock Request
 ```http
-GET /api/reports/sales?startDate=2026-06-01&endDate=2026-06-15
+POST /api/stock-requests
+Authorization: Bearer <JWT_TOKEN>
+Content-Type: application/json
 ```
-
-Query:
-
-| Parameter | Wajib | Default |
-|---|---:|---|
-| `startDate` | Tidak | Hari ini dikurangi 30 hari |
-| `endDate` | Tidak | Hari ini |
-
-Response:
-
+#### Request:
 ```json
 {
-  "totalSalesAmount": 5625000.0,
-  "totalTransactions": 128,
-  "averageTransactionValue": 43945.3125,
-  "taxAmount": 557432.43,
-  "dailySales": [
-    {
-      "date": "2026-06-15",
-      "totalSales": 450000.0,
-      "transactionCount": 12
-    }
-  ],
-  "salesByProduct": [
-    {
-      "productName": "Cafe Latte",
-      "quantitySold": 42,
-      "totalRevenue": 1260000.0
-    }
-  ]
+  "ingredientId": 1,
+  "requestedQuantity": 50.0,
+  "notes": "Susu UHT untuk stok espresso bar"
 }
 ```
 
-Rentang tanggal bersifat inklusif. Hari tanpa transaksi tetap muncul pada `dailySales` dengan nilai nol.
-
-### Laporan Pembelian
-
+### Daftar Stock Request (dengan filter targetRole)
 ```http
-GET /api/reports/purchases?startDate=2026-06-01&endDate=2026-06-15
+GET /api/stock-requests?targetRole=MANAGEMENT
+Authorization: Bearer <JWT_TOKEN>
 ```
 
-Default query sama dengan laporan penjualan.
+#### Response `200 OK`:
+* `requestedByRole`: Peran dari pembuat pengajuan.
+* `targetRole`: Peran dari penerima pengajuan yang wajib menyetujui.
+* `type`: Selalu bernilai `"STOCK_REQUEST"`.
+* `rejectReason`: Alasan jika stock request ditolak.
+```json
+[
+  {
+    "id": 1,
+    "requestNumber": "SR-1781626216812",
+    "ingredientId": 1,
+    "ingredientCode": "ING-001",
+    "ingredientName": "Arabica Bean",
+    "ingredientUnit": "gram",
+    "requestedQuantity": 50.0,
+    "notes": "Susu UHT untuk stok espresso bar",
+    "status": "REQUESTED",
+    "requestedBy": "gudang_user",
+    "requestedByRole": "GUDANG",
+    "targetRole": "MANAGEMENT",
+    "type": "STOCK_REQUEST",
+    "rejectReason": null,
+    "requestedAt": "2026-06-16T23:10:15",
+    "processedBy": null,
+    "processedAt": null,
+    "completedAt": null
+  }
+]
+```
 
-Response:
-
+### Tolak Stock Request (Status: REJECTED)
+```http
+PATCH /api/stock-requests/{id}/reject
+Authorization: Bearer <JWT_TOKEN>
+Content-Type: application/json
+```
+#### Request:
 ```json
 {
-  "totalPurchaseAmount": 2500000.0,
-  "totalOrders": 4,
-  "receivedOrders": 3,
-  "draftOrders": 1,
-  "purchaseBySupplier": [
-    {
-      "supplierName": "PT Biji Kopi",
-      "orderCount": 2,
-      "totalSpent": 1750000.0
-    }
-  ],
-  "dailyPurchases": [
-    {
-      "date": "2026-06-15",
-      "totalSpent": 750000.0,
-      "orderCount": 1
-    }
-  ]
+  "reason": "Stok gudang pusat sedang kritis"
 }
 ```
 
-Nilai pembelian dihitung dari subtotal item seluruh PO dalam rentang tanggal, termasuk PO berstatus `DRAFT`.
+---
 
-### Laporan Inventori
+## 8. Persetujuan Terpusat (Centralized Approvals)
+
+Menampung seluruh perizinan transaksi sensitif (seperti void transaksi, penyesuaian stok manual, atau pengajuan bahan baku baru) ke dalam satu wadah persetujuan terpusat.
+
+### Daftar Pengajuan Approval (dengan filter targetRole)
+Mendapatkan semua pengajuan approval terpusat, dengan filter penerima (`targetRole`).
 
 ```http
-GET /api/reports/inventory
+GET /api/approvals?targetRole=GUDANG
+Authorization: Bearer <JWT_TOKEN>
 ```
 
-Response:
-
+#### Response `200 OK`:
+* `requestedByRole`: Peran dari pembuat pengajuan.
+* `targetRole`: Peran dari penerima pengajuan yang wajib memproses.
 ```json
-{
-  "totalIngredients": 2,
-  "lowStockIngredientsCount": 1,
-  "totalInventoryValue": 825000.0,
-  "ingredientStockStatus": [
-    {
-      "ingredientId": 1,
-      "ingredientCode": "ING-001",
-      "ingredientName": "Arabica Bean",
-      "currentStock": 5000.0,
-      "minimumStock": 1000.0,
-      "costPrice": 150.0,
-      "totalValue": 750000.0,
-      "isLowStock": false
-    }
-  ]
-}
+[
+  {
+    "id": 1,
+    "requestNumber": "APR-VOID-1781626216802",
+    "type": "VOID_TRANSACTION",
+    "status": "PENDING",
+    "requestedByUsername": "admin_user",
+    "requestedByName": "Admin POS Test",
+    "requestedByRole": "MANAGEMENT",
+    "targetRole": "GUDANG",
+    "approvedByUsername": null,
+    "reason": "Pengajuan void transaksi TRX-1781626216791 oleh admin_user",
+    "rejectReason": null,
+    "referenceId": 4,
+    "payloadJson": "{}",
+    "createdAt": "2026-06-16T23:10:15",
+    "requestedAt": "2026-06-16T23:10:15"
+  }
+]
 ```
 
-`totalValue` dihitung dari `currentStock * costPrice`. Pada laporan ini low stock menggunakan kondisi `currentStock < minimumStock`.
+---
 
-## Contoh Integrasi Swift
+## 9. Matriks Aturan Hak Akses & Rejection (PENTING!)
+
+Untuk menjaga keamanan operasional dan audit kepatuhan, sistem backend menerapkan matriks validasi ketat di tingkat controller dan service:
+
+### A. Matriks Penerimaan & Target Role
+
+| Tipe Aksi Pengajuan | Pembuat Pengajuan | Peran Penerima (`targetRole`) | Keterangan |
+|---|---|---|---|
+| **STOCK_REQUEST (oleh Gudang)** | `GUDANG` | `MANAGEMENT` | Hanya Management yang berhak memproses/approve/reject. |
+| **STOCK_REQUEST (oleh Management)** | `MANAGEMENT` | `GUDANG` | Hanya Gudang yang berhak memproses/approve/reject. |
+| **VOID_TRANSACTION** | `MANAGEMENT` / `KASIR` | `GUDANG` | Hanya Gudang yang berhak memproses/approve/reject. |
+| **STOCK_ADJUSTMENT** | `GUDANG` | `MANAGEMENT` | Hanya Management yang berhak memproses/approve/reject. |
+| **NEW_INGREDIENT** | `MANAGEMENT` | `GUDANG` | Hanya Gudang yang berhak memproses/approve/reject. |
+
+### B. Aturan Perlindungan Keamanan (Audit Constraints)
+
+1. **Perlindungan Self-Processing (Dilarang Memproses Sendiri)**:
+   * Pengguna yang **mengajukan** (pembuat request asli) **tidak boleh** memproses, menyetujui (`approve`), atau menolak (`reject`) pengajuannya sendiri.
+   * Pelanggaran aturan ini menghasilkan error HTTP `403 Forbidden` / `Access Denied` dengan pesan:
+     ```json
+     {
+       "success": false,
+       "message": "Anda tidak memiliki izin untuk memproses pengajuan ini."
+     }
+     ```
+2. **Pencocokan Target Role**:
+   * Pengguna yang sedang masuk harus memiliki role aktif yang terdaftar sama dengan `targetRole` pengajuan tersebut.
+   * Pengguna dengan role lain (seperti `KASIR`) yang mencoba menyetujui atau menolak pengajuan akan diblokir dengan error HTTP `403 Forbidden` / `Access Denied`.
+
+### C. Proteksi Validasi Shift Sebelum Checkout (POS Checkout Rule)
+* Pengguna dengan role **`KASIR`** wajib memiliki shift aktif (status `OPEN`) sebelum dapat melakukan checkout POS (`POST /api/transactions`).
+* Jika role **`KASIR`** terdeteksi tidak memiliki shift aktif, checkout akan ditolak dengan error HTTP `422 Unprocessable Entity` dan pesan kesalahan:
+  ```json
+  {
+    "success": false,
+    "message": "Shift kasir belum dibuka oleh Manajemen."
+  }
+  ```
+
+### D. Persyaratan Integrasi Frontend (UI Requirements)
+
+* **Tombol Aksi**: Di layar aplikasi client, tombol **Approve**, **Reject**, atau **Proses** hanya boleh aktif/muncul bagi pengguna dengan role penerima (`targetRole`) **dan** bukan pembuat request.
+* **Pesanan/Pengajuan Sendiri**: Tampilkan status pengajuan secara informatif saja ("Menunggu Persetujuan"), dan hilangkan pilihan aksi tombol.
+* **Penyampaian Error**: Jika API mengembalikan status `403`, frontend wajib menangani error tersebut secara anggun dan menampilkan pesan konsisten: **“Anda tidak memiliki izin untuk memproses pengajuan ini.”**
+
+---
+
+## 10. WhatsApp Integrasi untuk Kontak Gudang
+
+Saat terjadi kondisi stok menipis (critical/low stock), aplikasi kasir/POS dapat mencari kontak staf gudang yang sedang **online** (`isOnline: true`) melalui `/api/users/online?role=GUDANG`.
+
+Frontend dapat memfasilitasi komunikasi langsung dengan menampilkan tombol kirim pesan instan melalui WhatsApp API menggunakan format URL:
 
 ```swift
-struct LoginRequest: Encodable {
-    let username: String
-    let password: String
-}
-
-struct LoginResponse: Decodable {
-    let token: String
-    let username: String
-    let role: String
-}
-
-func authorizedRequest(url: URL, token: String) -> URLRequest {
-    var request = URLRequest(url: url)
-    request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-    return request
-}
+let waURL = "https://wa.me/\(phoneNumber)?text=\(messageText.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
 ```
 
-Simpan token di Keychain, bukan `UserDefaults`, untuk aplikasi production. Saat menerima `401`, hapus session lokal dan minta user login kembali.
+* **Format Nomor Telepon**: Gunakan kode negara di depan nomor (contoh: `628123456789`).
+* **Pesan Contoh**: *"Halo Staf Gudang, stok bahan baku Susu UHT terdeteksi menipis di POS outlet. Mohon segera dicek. Terima kasih."*
 
-## Urutan Setup Data
+---
 
-Urutan yang disarankan untuk lingkungan baru:
+## 11. Endpoint Health Check, Reports, & Audit Trail Update
 
-1. Login menggunakan admin bootstrap.
-2. Ambil ID role langsung dari database jika perlu membuat user.
-3. Buat kategori.
-4. Buat supplier.
-5. Buat ingredient.
-6. Buat produk.
-7. Buat recipe produk.
-8. Buat PO dan item PO.
-9. Receive PO untuk mengisi stok.
-10. Buat transaksi POS.
-11. Periksa dashboard, stock movement, dan reports.
+### A. Health Check Endpoint
+* **URL**: `GET /api/health`
+* **Authorization**: Tidak memerlukan autentikasi (`permitAll`)
+* **Response (200 OK)**:
+  ```json
+  {
+    "status": "UP",
+    "database": "UP",
+    "timestamp": "2026-06-17T10:00:00.123456"
+  }
+  ```
+
+### B. Standard Report Query Parameters
+* **Endpoints**: 
+  * `GET /api/reports/sales`
+  * `GET /api/reports/sales/csv`
+  * `GET /api/reports/purchases`
+  * `GET /api/reports/purchases/csv`
+* **Query Parameters**:
+  * `from` / `startDate`: Format `yyyy-MM-dd`
+  * `to` / `endDate`: Format `yyyy-MM-dd`
+  * `groupBy`: `DAY` (default), `WEEK`, `MONTH`
+* **CSV Content-Type**: `text/csv; charset=utf-8` dengan header `Content-Disposition`.
+
+### C. Conflict Error Matrix (409 Conflict)
+* **Aturan**: Pengajuan approval (Void, Stock Adjustment, New Ingredient) atau Purchase Order yang statusnya sudah final (telah disetujui, ditolak, atau diproses) **tidak boleh** diproses kembali.
+* **Response (409 Conflict)**:
+  ```json
+  {
+    "success": false,
+    "message": "Hanya pengajuan PENDING yang dapat disetujui / ditolak."
+  }
+  ```
+
+### D. Stock Movement Response Format
+* **Endpoint**: `GET /api/warehouse` / `GET /api/stock-movements`
+* **Response JSON Structure**:
+  ```json
+  {
+    "id": 100,
+    "ingredientId": 1,
+    "ingredientName": "Fresh Milk",
+    "movementType": "SALE_CONSUMPTION",
+    "quantity": -150.0,
+    "stockBefore": 1000.0,
+    "stockAfter": 850.0,
+    "referenceNumber": "TRX-20260617-0001",
+    "movementDate": "2026-06-17T10:00:00",
+    "createdBy": "jane.kasir"
+  }
+  ```
+* **Movement Types**: `SALE_CONSUMPTION`, `PURCHASE_RECEIVE`, `STOCK_REQUEST_COMPLETED`, `MANUAL_ADJUSTMENT`, `VOID_REVERSAL`.
+* **Quantity**: Bertanda negatif (`-`) untuk pengurangan stok dan positif (`+`) untuk penambahan stok.
+

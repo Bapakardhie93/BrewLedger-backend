@@ -26,6 +26,13 @@ public class Product extends BaseEntity {
     private String description;
 
     @Column(nullable = false)
+    private Boolean useCustomHpp = false;
+
+    private Double customHpp = 0.0;
+
+    private Double margin = 0.0;
+
+    @Column(nullable = false)
     private Boolean active = true;
 
 

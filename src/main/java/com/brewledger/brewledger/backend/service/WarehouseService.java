@@ -40,6 +40,8 @@ public class WarehouseService {
     private final PurchaseOrderRepository purchaseOrderRepository;
     private final PurchaseOrderItemRepository purchaseOrderItemRepository;
     private final CurrentUserService currentUserService;
+    private final ActivityLogService activityLogService;
+    private final NotificationService notificationService;
 
     @Transactional(readOnly = true)
     public WarehouseResponse getWorkspace(String keyword) {
@@ -67,6 +69,27 @@ public class WarehouseService {
                         <= valueOrZero(ingredient.getMinimumStock()))
                 .count();
 
+        com.brewledger.brewledger.backend.entity.User user = currentUserService.requireCurrentUser();
+        com.brewledger.brewledger.backend.dto.user.RoleResponse roleResponse = new com.brewledger.brewledger.backend.dto.user.RoleResponse(
+                user.getRole().getId(),
+                user.getRole().getName(),
+                user.getRole().getDescription()
+        );
+        boolean isOnline = user.getLastActivity() != null 
+                && user.getLastActivity().isAfter(java.time.LocalDateTime.now().minusMinutes(5));
+        com.brewledger.brewledger.backend.dto.user.UserResponse currentUserResponse = new com.brewledger.brewledger.backend.dto.user.UserResponse(
+                user.getId(),
+                user.getFullName(),
+                user.getUsername(),
+                user.getActive(),
+                user.getMustChangePassword(),
+                user.getLastLogin(),
+                user.getPhoneNumber(),
+                user.getLastActivity(),
+                isOnline,
+                roleResponse
+        );
+
         return new WarehouseResponse(
                 LocalDateTime.now(),
                 (long) allIngredients.size(),
@@ -86,7 +109,8 @@ public class WarehouseService {
                         ))
                         .map(this::mapMovement)
                         .toList(),
-                approvalRequests.stream().map(this::mapApproval).toList()
+                approvalRequests.stream().map(this::mapApproval).toList(),
+                currentUserResponse
         );
     }
 
@@ -95,6 +119,16 @@ public class WarehouseService {
             Long ingredientId,
             UpdateWarehouseIngredientRequest request
     ) {
+        if (request.getPurchasePrice() != null && request.getPurchasePrice() < 0.0) {
+            throw new com.brewledger.brewledger.backend.exception.BusinessException("Harga pembelian (purchasePrice) tidak boleh negatif");
+        }
+        if (request.getPackSize() != null && request.getPackSize() <= 0.0) {
+            throw new com.brewledger.brewledger.backend.exception.BusinessException("Ukuran kemasan (packSize) harus lebih besar dari 0");
+        }
+        if (request.getCostPrice() != null && request.getCostPrice() < 0.0) {
+            throw new com.brewledger.brewledger.backend.exception.BusinessException("Harga pokok (costPrice) tidak boleh negatif");
+        }
+
         Ingredient ingredient = requireIngredient(ingredientId);
         Supplier supplier = supplierRepository.findById(request.getSupplierId())
                 .orElseThrow(() -> new ResourceNotFoundException(
@@ -105,16 +139,44 @@ public class WarehouseService {
         ingredient.setSupplier(supplier);
         ingredient.setUnit(request.getUnit());
         ingredient.setMinimumStock(request.getMinimumStock());
-        ingredient.setCostPrice(request.getCostPrice());
+        
+        Double purchase = request.getPurchasePrice();
+        Double size = request.getPackSize();
+        if (purchase == null) {
+            purchase = (request.getCostPrice() != null) ? request.getCostPrice() : (ingredient.getPurchasePrice() != null ? ingredient.getPurchasePrice() : 0.0);
+        }
+        if (size == null) {
+            size = (ingredient.getPackSize() != null) ? ingredient.getPackSize() : 1.0;
+        }
+        ingredient.setPurchasePrice(purchase);
+        ingredient.setPackSize(size);
+        ingredient.setCostPrice(purchase / (size > 0.0 ? size : 1.0));
+        
         ingredient.setActive(request.getActive());
 
         return mapIngredient(ingredientRepository.save(ingredient));
     }
 
+    @org.springframework.beans.factory.annotation.Autowired
+    @org.springframework.context.annotation.Lazy
+    private ApprovalRequestService approvalRequestService;
+
     @Transactional
     public WarehouseIngredientResponse adjustStock(
             Long ingredientId,
             StockAdjustmentRequest request
+    ) {
+        approvalRequestService.submitStockAdjustment(ingredientId, request);
+        throw new com.brewledger.brewledger.backend.exception.BusinessException(
+                "Pengajuan penyesuaian stok berhasil diajukan dengan status PENDING dan memerlukan persetujuan MANAGEMENT."
+        );
+    }
+
+    @Transactional
+    public void executeStockAdjustmentDirectly(
+            Long ingredientId,
+            StockAdjustmentRequest request,
+            com.brewledger.brewledger.backend.entity.User requestedBy
     ) {
         Ingredient ingredient = requireIngredient(ingredientId);
         double stockBefore = valueOrZero(ingredient.getCurrentStock());
@@ -125,20 +187,28 @@ public class WarehouseService {
 
         StockMovement movement = new StockMovement();
         movement.setIngredient(ingredient);
-        movement.setQuantity(Math.abs(stockAfter - stockBefore));
+        movement.setQuantity(stockAfter - stockBefore);
         movement.setStockBefore(stockBefore);
         movement.setStockAfter(stockAfter);
-        movement.setMovementType(stockAfter >= stockBefore ? "ADJUSTMENT_IN" : "ADJUSTMENT_OUT");
+        movement.setMovementType("MANUAL_ADJUSTMENT");
         String reason = request.getReason().trim();
         String shortenedReason = reason.length() > 80 ? reason.substring(0, 80) : reason;
         movement.setReferenceNumber(
-                "ADJ-" + currentUserService.requireCurrentUser().getUsername()
+                "ADJ-" + requestedBy.getUsername()
                         + "-" + System.currentTimeMillis() + "-" + shortenedReason
         );
         movement.setMovementDate(LocalDateTime.now());
+        movement.setCreatedBy(requestedBy.getUsername());
         stockMovementRepository.save(movement);
 
-        return mapIngredient(ingredient);
+        // Record Audit Log
+        activityLogService.record("STOCK_ADJUSTMENT", 
+                "Adjusted stock for ingredient: " + ingredient.getName() + " (" + ingredient.getCode() + ") from " + stockBefore + " to " + stockAfter + ". Reason: " + request.getReason());
+
+        // Check if stock is low
+        if (stockAfter <= valueOrZero(ingredient.getMinimumStock())) {
+            notificationService.sendAlert("Stok bahan baku rendah: " + ingredient.getName() + " (" + ingredient.getCode() + ") memiliki stok " + stockAfter + " " + ingredient.getUnit() + " (Minimum: " + ingredient.getMinimumStock() + " " + ingredient.getUnit() + ")");
+        }
     }
 
     private Ingredient requireIngredient(Long ingredientId) {
@@ -160,6 +230,8 @@ public class WarehouseService {
                 valueOrZero(ingredient.getCurrentStock()),
                 valueOrZero(ingredient.getMinimumStock()),
                 valueOrZero(ingredient.getCostPrice()),
+                ingredient.getPurchasePrice() != null ? ingredient.getPurchasePrice() : 0.0,
+                ingredient.getPackSize() != null ? ingredient.getPackSize() : 1.0,
                 ingredient.getSupplier() != null ? ingredient.getSupplier().getName() : "Tanpa Supplier",
                 lowStock ? "LOW_STOCK" : "SAFE",
                 ingredient.getActive()
@@ -182,13 +254,15 @@ public class WarehouseService {
     private StockMovementResponse mapMovement(StockMovement movement) {
         return new StockMovementResponse(
                 movement.getId(),
+                movement.getIngredient().getId(),
                 movement.getIngredient().getName(),
                 movement.getMovementType(),
                 movement.getQuantity(),
                 movement.getStockBefore(),
                 movement.getStockAfter(),
                 movement.getReferenceNumber(),
-                movement.getMovementDate()
+                movement.getMovementDate(),
+                movement.getCreatedBy()
         );
     }
 

@@ -2,6 +2,7 @@ package com.brewledger.brewledger.backend.service;
 
 import com.brewledger.brewledger.backend.dto.report.*;
 import com.brewledger.brewledger.backend.entity.*;
+import com.brewledger.brewledger.backend.enums.PaymentStatus;
 import com.brewledger.brewledger.backend.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -22,46 +23,99 @@ public class ReportService {
     private final PurchaseOrderItemRepository purchaseOrderItemRepository;
     private final IngredientRepository ingredientRepository;
 
+    private LocalDate getGroupDate(LocalDate date, String groupBy) {
+        if ("WEEK".equalsIgnoreCase(groupBy)) {
+            return date.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY));
+        } else if ("MONTH".equalsIgnoreCase(groupBy)) {
+            return date.with(java.time.temporal.TemporalAdjusters.firstDayOfMonth());
+        }
+        return date;
+    }
+
     @Transactional(readOnly = true)
     public SalesReportResponse getSalesReport(LocalDate startDate, LocalDate endDate) {
+        return getSalesReport(startDate, endDate, "DAY");
+    }
+
+    @Transactional(readOnly = true)
+    public SalesReportResponse getSalesReport(LocalDate startDate, LocalDate endDate, String groupBy) {
         LocalDateTime start = startDate.atStartOfDay();
         LocalDateTime end = endDate.atTime(23, 59, 59, 999999999);
 
-        List<Transaction> transactions = transactionRepository.findByDateRange(start, end);
-        List<TransactionItem> items = transactionItemRepository.findByTransactionDateRange(start, end);
+        // Filter out cancelled transactions
+        List<Transaction> transactions = transactionRepository.findByDateRange(start, end).stream()
+                .filter(t -> t.getPaymentStatus() != PaymentStatus.CANCELLED)
+                .toList();
+        List<TransactionItem> items = transactionItemRepository.findByTransactionDateRange(start, end).stream()
+                .filter(ti -> ti.getTransaction().getPaymentStatus() != PaymentStatus.CANCELLED)
+                .toList();
 
         double totalSalesAmount = 0.0;
         double taxAmount = 0.0;
+        double totalCogs = 0.0;
+
         for (Transaction t : transactions) {
             totalSalesAmount += t.getTotal() != null ? t.getTotal() : 0.0;
             taxAmount += t.getTax() != null ? t.getTax() : 0.0;
         }
+
+        for (TransactionItem item : items) {
+            totalCogs += item.getSubtotalCost() != null ? item.getSubtotalCost() : 0.0;
+        }
+
+        double netSales = totalSalesAmount - taxAmount;
+        double grossProfit = netSales - totalCogs;
+        double grossProfitMargin = netSales > 0 ? (grossProfit / netSales) * 100 : 0.0;
 
         long totalTransactions = transactions.size();
         double averageTransactionValue = totalTransactions > 0 ? totalSalesAmount / totalTransactions : 0.0;
 
         // Daily breakdown
         Map<LocalDate, DailySalesData> dailyMap = new HashMap<>();
-        // Pre-fill daily slots
-        LocalDate current = startDate;
-        while (!current.isAfter(endDate)) {
-            dailyMap.put(current, new DailySalesData(0.0, 0L));
-            current = current.plusDays(1);
+        if (groupBy == null || "DAY".equalsIgnoreCase(groupBy)) {
+            // Pre-fill daily slots
+            LocalDate current = startDate;
+            while (!current.isAfter(endDate)) {
+                dailyMap.put(current, new DailySalesData(0.0, 0L, 0.0, 0.0));
+                current = current.plusDays(1);
+            }
         }
 
         for (Transaction t : transactions) {
-            LocalDate date = t.getCreatedAt().toLocalDate();
+            LocalDate date = getGroupDate(t.getCreatedAt().toLocalDate(), groupBy);
             DailySalesData data = dailyMap.get(date);
             if (data == null) {
-                data = new DailySalesData(0.0, 0L);
+                data = new DailySalesData(0.0, 0L, 0.0, 0.0);
                 dailyMap.put(date, data);
             }
             data.totalSales += t.getTotal() != null ? t.getTotal() : 0.0;
             data.count++;
+            double discount = t.getDiscountAmount() != null ? t.getDiscountAmount() : 0.0;
+            double sub = t.getSubtotal() != null ? t.getSubtotal() : 0.0;
+            data.netSales += (sub - discount);
+        }
+
+        for (TransactionItem item : items) {
+            LocalDate date = getGroupDate(item.getTransaction().getCreatedAt().toLocalDate(), groupBy);
+            DailySalesData data = dailyMap.get(date);
+            if (data != null) {
+                data.totalCogs += item.getSubtotalCost() != null ? item.getSubtotalCost() : 0.0;
+            }
         }
 
         List<SalesReportResponse.DailySalesSummary> dailySales = dailyMap.entrySet().stream()
-                .map(e -> new SalesReportResponse.DailySalesSummary(e.getKey(), e.getValue().totalSales, e.getValue().count))
+                .map(e -> {
+                    double sales = e.getValue().totalSales;
+                    double cogs = e.getValue().totalCogs;
+                    double profit = e.getValue().netSales - cogs;
+                    return new SalesReportResponse.DailySalesSummary(
+                             e.getKey(), 
+                             sales, 
+                             e.getValue().count, 
+                             cogs, 
+                             profit
+                    );
+                })
                 .sorted(Comparator.comparing(SalesReportResponse.DailySalesSummary::getDate))
                 .toList();
 
@@ -71,15 +125,27 @@ public class ReportService {
             String name = item.getProductName();
             ProductSalesData data = productMap.get(name);
             if (data == null) {
-                data = new ProductSalesData(0L, 0.0);
+                data = new ProductSalesData(0L, 0.0, 0.0);
                 productMap.put(name, data);
             }
             data.quantity += item.getQuantity() != null ? item.getQuantity() : 0;
             data.revenue += item.getSubtotal() != null ? item.getSubtotal() : 0.0;
+            data.totalCogs += item.getSubtotalCost() != null ? item.getSubtotalCost() : 0.0;
         }
 
         List<SalesReportResponse.SalesByProductSummary> salesByProduct = productMap.entrySet().stream()
-                .map(e -> new SalesReportResponse.SalesByProductSummary(e.getKey(), e.getValue().quantity, e.getValue().revenue))
+                .map(e -> {
+                    double revenue = e.getValue().revenue;
+                    double cogs = e.getValue().totalCogs;
+                    double profit = revenue - cogs;
+                    return new SalesReportResponse.SalesByProductSummary(
+                            e.getKey(), 
+                            e.getValue().quantity, 
+                            revenue, 
+                            cogs, 
+                            profit
+                    );
+                })
                 .sorted((a, b) -> b.getTotalRevenue().compareTo(a.getTotalRevenue()))
                 .toList();
 
@@ -88,6 +154,9 @@ public class ReportService {
                 totalTransactions,
                 averageTransactionValue,
                 taxAmount,
+                totalCogs,
+                grossProfit,
+                grossProfitMargin,
                 dailySales,
                 salesByProduct
         );
@@ -95,6 +164,11 @@ public class ReportService {
 
     @Transactional(readOnly = true)
     public PurchaseReportResponse getPurchaseReport(LocalDate startDate, LocalDate endDate) {
+        return getPurchaseReport(startDate, endDate, "DAY");
+    }
+
+    @Transactional(readOnly = true)
+    public PurchaseReportResponse getPurchaseReport(LocalDate startDate, LocalDate endDate, String groupBy) {
         List<PurchaseOrder> pos = purchaseOrderRepository.findByDateRange(startDate, endDate);
         List<PurchaseOrderItem> items = purchaseOrderItemRepository.findByPurchaseOrderDateRange(startDate, endDate);
 
@@ -129,14 +203,16 @@ public class ReportService {
 
         // Daily breakdown
         Map<LocalDate, DailyPurchaseData> dailyMap = new HashMap<>();
-        LocalDate current = startDate;
-        while (!current.isAfter(endDate)) {
-            dailyMap.put(current, new DailyPurchaseData(0.0, 0L));
-            current = current.plusDays(1);
+        if (groupBy == null || "DAY".equalsIgnoreCase(groupBy)) {
+            LocalDate current = startDate;
+            while (!current.isAfter(endDate)) {
+                dailyMap.put(current, new DailyPurchaseData(0.0, 0L));
+                current = current.plusDays(1);
+            }
         }
 
         for (PurchaseOrder po : pos) {
-            LocalDate date = po.getOrderDate();
+            LocalDate date = getGroupDate(po.getOrderDate(), groupBy);
             DailyPurchaseData data = dailyMap.get(date);
             if (data == null) {
                 data = new DailyPurchaseData(0.0, 0L);
@@ -145,7 +221,7 @@ public class ReportService {
             data.orderCount++;
         }
         for (PurchaseOrderItem item : items) {
-            LocalDate date = item.getPurchaseOrder().getOrderDate();
+            LocalDate date = getGroupDate(item.getPurchaseOrder().getOrderDate(), groupBy);
             DailyPurchaseData data = dailyMap.get(date);
             if (data != null) {
                 data.totalSpent += item.getSubtotal() != null ? item.getSubtotal() : 0.0;
@@ -208,22 +284,105 @@ public class ReportService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public String exportSalesReportCsv(LocalDate startDate, LocalDate endDate) {
+        return exportSalesReportCsv(startDate, endDate, "DAY");
+    }
+
+    @Transactional(readOnly = true)
+    public String exportSalesReportCsv(LocalDate startDate, LocalDate endDate, String groupBy) {
+        SalesReportResponse report = getSalesReport(startDate, endDate, groupBy);
+        StringBuilder csv = new StringBuilder();
+        // Header
+        csv.append("Tanggal,Jumlah Transaksi,Total Penjualan (Gross),Total HPP (COGS),Gross Profit\n");
+        for (SalesReportResponse.DailySalesSummary summary : report.getDailySales()) {
+            csv.append(summary.getDate()).append(",")
+                    .append(summary.getTransactionCount()).append(",")
+                    .append(summary.getTotalSales()).append(",")
+                    .append(summary.getTotalCogs()).append(",")
+                    .append(summary.getGrossProfit()).append("\n");
+        }
+
+        csv.append("\n\nProduk Terlaris\n");
+        csv.append("Nama Produk,Jumlah Terjual,Total Pendapatan,Total HPP (COGS),Gross Profit\n");
+        for (SalesReportResponse.SalesByProductSummary summary : report.getSalesByProduct()) {
+            csv.append("\"").append(summary.getProductName().replace("\"", "\"\"")).append("\",")
+                    .append(summary.getQuantitySold()).append(",")
+                    .append(summary.getTotalRevenue()).append(",")
+                    .append(summary.getTotalCogs()).append(",")
+                    .append(summary.getGrossProfit()).append("\n");
+        }
+        return csv.toString();
+    }
+
+    @Transactional(readOnly = true)
+    public String exportPurchaseReportCsv(LocalDate startDate, LocalDate endDate) {
+        return exportPurchaseReportCsv(startDate, endDate, "DAY");
+    }
+
+    @Transactional(readOnly = true)
+    public String exportPurchaseReportCsv(LocalDate startDate, LocalDate endDate, String groupBy) {
+        PurchaseReportResponse report = getPurchaseReport(startDate, endDate, groupBy);
+        StringBuilder csv = new StringBuilder();
+        // Header
+        csv.append("Tanggal,Jumlah Order,Total Pengeluaran Pembelian\n");
+        for (PurchaseReportResponse.DailyPurchaseSummary summary : report.getDailyPurchases()) {
+            csv.append(summary.getDate()).append(",")
+                    .append(summary.getOrderCount()).append(",")
+                    .append(summary.getTotalSpent()).append("\n");
+        }
+
+        csv.append("\n\nPembelian per Supplier\n");
+        csv.append("Nama Supplier,Jumlah Order,Total Pembelian\n");
+        for (PurchaseReportResponse.PurchaseBySupplierSummary summary : report.getPurchaseBySupplier()) {
+            csv.append("\"").append(summary.getSupplierName().replace("\"", "\"\"")).append("\",")
+                    .append(summary.getOrderCount()).append(",")
+                    .append(summary.getTotalSpent()).append("\n");
+        }
+        return csv.toString();
+    }
+
+    @Transactional(readOnly = true)
+    public String exportInventoryReportCsv() {
+        InventoryReportResponse report = getInventoryReport();
+        StringBuilder csv = new StringBuilder();
+        // Header
+        csv.append("ID Bahan,Kode,Nama Bahan,Stok Saat Ini,Stok Minimum,Harga Beli (Modal),Total Nilai Inventaris,Stok Rendah (Alert)\n");
+        for (InventoryReportResponse.IngredientStockStatus status : report.getIngredientStockStatus()) {
+            csv.append(status.getIngredientId()).append(",")
+                    .append(status.getIngredientCode()).append(",")
+                    .append("\"").append(status.getIngredientName().replace("\"", "\"\"")).append("\",")
+                    .append(status.getCurrentStock()).append(",")
+                    .append(status.getMinimumStock()).append(",")
+                    .append(status.getCostPrice()).append(",")
+                    .append(status.getTotalValue()).append(",")
+                    .append(status.getIsLowStock() ? "YA" : "TIDAK").append("\n");
+        }
+        return csv.toString();
+    }
+
     // Helper classes for grouping operations
     private static class DailySalesData {
         double totalSales;
         long count;
-        DailySalesData(double totalSales, long count) {
+        double totalCogs;
+        double netSales;
+        DailySalesData(double totalSales, long count, double totalCogs, double netSales) {
             this.totalSales = totalSales;
             this.count = count;
+            this.totalCogs = totalCogs;
+            this.netSales = netSales;
         }
     }
 
     private static class ProductSalesData {
         long quantity;
         double revenue;
-        ProductSalesData(long quantity, double revenue) {
+        double totalCogs;
+        ProductSalesData(long quantity, double revenue, double totalCogs) {
             this.quantity = quantity;
             this.revenue = revenue;
+            this.totalCogs = totalCogs;
         }
     }
 

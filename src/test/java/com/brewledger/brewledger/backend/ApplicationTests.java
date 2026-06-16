@@ -20,6 +20,14 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import com.brewledger.brewledger.backend.repository.UserRepository;
+import com.brewledger.brewledger.backend.repository.RoleRepository;
+import com.brewledger.brewledger.backend.entity.User;
+import com.brewledger.brewledger.backend.entity.Role;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -46,6 +54,12 @@ class ApplicationTests {
 
 	@Autowired
 	private IngredientRepository ingredientRepository;
+
+	@Autowired
+	private UserRepository userRepository;
+
+	@Autowired
+	private RoleRepository roleRepository;
 
 	@Test
 	void contextLoads() {
@@ -75,6 +89,7 @@ class ApplicationTests {
 	}
 
 	@Test
+	@WithMockUser(username = "testadmin", roles = "MANAGEMENT")
 	void warehouseWorkspaceLoads() {
 		WarehouseResponse response = warehouseService.getWorkspace("");
 
@@ -86,7 +101,7 @@ class ApplicationTests {
 	}
 
 	@Test
-	@WithMockUser(username = "testadmin", roles = "ADMIN")
+	@WithMockUser(username = "testadmin", roles = "MANAGEMENT")
 	void purchaseOrderApprovalFlowUpdatesStock() {
 		Supplier supplier = new Supplier();
 		supplier.setName("Integration Supplier");
@@ -115,6 +130,31 @@ class ApplicationTests {
 
 		assertThat(purchaseOrderService.submitForApproval(purchaseOrder.getId()).getStatus())
 				.isEqualTo(PurchaseOrderStatus.PENDING_APPROVAL.name());
+
+		// Create and authenticate as a different admin user to approve (to avoid self-approval error)
+		Role adminRole = roleRepository.findByName("MANAGEMENT").orElseGet(() -> {
+			Role r = new Role();
+			r.setName("MANAGEMENT");
+			r.setDescription("Administrator");
+			return roleRepository.save(r);
+		});
+		User secondAdmin = new User();
+		secondAdmin.setFullName("Second Admin");
+		secondAdmin.setUsername("second_admin_int_test");
+		secondAdmin.setPassword("password");
+		secondAdmin.setActive(true);
+		secondAdmin.setMustChangePassword(false);
+		secondAdmin.setRole(adminRole);
+		secondAdmin = userRepository.save(secondAdmin);
+
+		UsernamePasswordAuthenticationToken authentication =
+				new UsernamePasswordAuthenticationToken(
+						secondAdmin.getUsername(),
+						"N/A",
+						List.of(new SimpleGrantedAuthority("ROLE_" + secondAdmin.getRole().getName()))
+				);
+		SecurityContextHolder.getContext().setAuthentication(authentication);
+
 		assertThat(purchaseApprovalService.approve(purchaseOrder.getId()).getStatus())
 				.isEqualTo(PurchaseOrderStatus.APPROVED.name());
 		assertThat(purchaseOrderService.receive(purchaseOrder.getId()).getStatus())

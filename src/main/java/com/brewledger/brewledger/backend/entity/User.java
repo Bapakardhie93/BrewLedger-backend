@@ -34,6 +34,10 @@ public class User extends BaseEntity {
 
     private LocalDateTime lastLogin;
 
+    private String phoneNumber;
+
+    private LocalDateTime lastActivity;
+
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "role_id", nullable = false)
     private Role role;

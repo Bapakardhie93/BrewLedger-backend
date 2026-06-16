@@ -11,6 +11,8 @@ public class StockMovementResponse {
 
     private Long id;
 
+    private Long ingredientId;
+
     private String ingredientName;
 
     private String movementType;
@@ -24,4 +26,6 @@ public class StockMovementResponse {
     private String referenceNumber;
 
     private LocalDateTime movementDate;
+
+    private String createdBy;
 }

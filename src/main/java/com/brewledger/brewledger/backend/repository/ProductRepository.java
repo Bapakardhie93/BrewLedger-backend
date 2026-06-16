@@ -17,6 +17,8 @@ public interface ProductRepository
 
     boolean existsByCodeAndIdNot(String code, Long id);
 
+    boolean existsByCategoryId(Long categoryId);
+
     List<Product> findByNameContainingIgnoreCase(
             String keyword
     );

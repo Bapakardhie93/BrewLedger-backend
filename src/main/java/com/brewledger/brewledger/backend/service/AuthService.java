@@ -21,6 +21,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final CurrentUserService currentUserService;
 
     /**
      * Authenticates a user, updates last login timestamp, and returns a JWT token.
@@ -61,6 +62,43 @@ public class AuthService {
                 token,
                 user.getUsername(),
                 user.getRole().getName()
+        );
+    }
+
+    public void changePassword(com.brewledger.brewledger.backend.dto.auth.ChangePasswordRequest request) {
+        User currentUser = currentUserService.requireCurrentUser();
+
+        if (!passwordEncoder.matches(request.getOldPassword(), currentUser.getPassword())) {
+            throw new com.brewledger.brewledger.backend.exception.BusinessException("Password lama salah");
+        }
+
+        currentUser.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        currentUser.setMustChangePassword(false);
+        userRepository.save(currentUser);
+
+        log.info("Password changed successfully for user: {}", currentUser.getUsername());
+    }
+
+    public com.brewledger.brewledger.backend.dto.user.UserResponse getCurrentUserProfile() {
+        User user = currentUserService.requireCurrentUser();
+        com.brewledger.brewledger.backend.dto.user.RoleResponse roleResponse = new com.brewledger.brewledger.backend.dto.user.RoleResponse(
+                user.getRole().getId(),
+                user.getRole().getName(),
+                user.getRole().getDescription()
+        );
+        boolean isOnline = user.getLastActivity() != null 
+                && user.getLastActivity().isAfter(java.time.LocalDateTime.now().minusMinutes(5));
+        return new com.brewledger.brewledger.backend.dto.user.UserResponse(
+                user.getId(),
+                user.getFullName(),
+                user.getUsername(),
+                user.getActive(),
+                user.getMustChangePassword(),
+                user.getLastLogin(),
+                user.getPhoneNumber(),
+                user.getLastActivity(),
+                isOnline,
+                roleResponse
         );
     }
 }

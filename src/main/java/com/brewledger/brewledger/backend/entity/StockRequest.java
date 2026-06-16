@@ -49,4 +49,10 @@ public class StockRequest extends BaseEntity {
     private LocalDateTime processedAt;
 
     private LocalDateTime completedAt;
+
+    private String requestedByRole;
+
+    private String targetRole;
+
+    private String rejectReason;
 }

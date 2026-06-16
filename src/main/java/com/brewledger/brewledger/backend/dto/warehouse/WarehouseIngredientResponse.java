@@ -21,6 +21,10 @@ public class WarehouseIngredientResponse {
 
     private Double costPrice;
 
+    private Double purchasePrice;
+
+    private Double packSize;
+
     private String supplierName;
 
     private String stockStatus;

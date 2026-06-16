@@ -11,7 +11,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/stock-movements")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('ADMIN', 'MANAGEMENT', 'GUDANG')")
+@PreAuthorize("hasAnyRole('MANAGEMENT', 'GUDANG')")
 public class StockMovementController {
 
     private final StockMovementService service;

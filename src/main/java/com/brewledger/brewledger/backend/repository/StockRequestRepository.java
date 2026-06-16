@@ -8,4 +8,6 @@ import java.util.List;
 public interface StockRequestRepository extends JpaRepository<StockRequest, Long> {
 
     List<StockRequest> findAllByOrderByRequestedAtDesc();
+
+    boolean existsByIngredientId(Long ingredientId);
 }

@@ -12,6 +12,9 @@ public class SalesReportResponse {
     private Long totalTransactions;
     private Double averageTransactionValue;
     private Double taxAmount;
+    private Double totalCogs;
+    private Double grossProfit;
+    private Double grossProfitMargin;
     private List<DailySalesSummary> dailySales;
     private List<SalesByProductSummary> salesByProduct;
 
@@ -21,6 +24,8 @@ public class SalesReportResponse {
         private LocalDate date;
         private Double totalSales;
         private Long transactionCount;
+        private Double totalCogs;
+        private Double grossProfit;
     }
 
     @Getter
@@ -29,5 +34,7 @@ public class SalesReportResponse {
         private String productName;
         private Long quantitySold;
         private Double totalRevenue;
+        private Double totalCogs;
+        private Double grossProfit;
     }
 }

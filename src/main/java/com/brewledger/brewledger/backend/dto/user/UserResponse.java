@@ -16,5 +16,8 @@ public class UserResponse {
     private Boolean active;
     private Boolean mustChangePassword;
     private LocalDateTime lastLogin;
+    private String phoneNumber;
+    private LocalDateTime lastActivity;
+    private Boolean isOnline;
     private RoleResponse role;
 }

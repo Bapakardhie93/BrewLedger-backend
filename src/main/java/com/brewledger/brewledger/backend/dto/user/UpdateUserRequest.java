@@ -17,4 +17,6 @@ public class UpdateUserRequest {
 
     @NotNull(message = "Role ID wajib diisi")
     private Long roleId;
+
+    private String phoneNumber;
 }

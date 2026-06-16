@@ -48,6 +48,31 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handles request conflicts (e.g. invalid state transition).
+     * Returns HTTP 409 Conflict.
+     */
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<ApiErrorResponse> handleConflictException(
+            ConflictException ex
+    ) {
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(new ApiErrorResponse(false, ex.getMessage()));
+    }
+
+    /**
+     * Handles AccessDeniedException (HTTP 403 Forbidden).
+     */
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<ApiErrorResponse> handleAccessDeniedException(
+            org.springframework.security.access.AccessDeniedException ex
+    ) {
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(new ApiErrorResponse(false, ex.getMessage()));
+    }
+
+    /**
      * Handles @Valid / @NotBlank validation failures on request bodies.
      * Returns HTTP 400 Bad Request with the first field error message.
      */
@@ -65,6 +90,30 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(new ApiErrorResponse(false, message));
+    }
+
+    /**
+     * Handles BadRequestException (HTTP 400 Bad Request).
+     */
+    @ExceptionHandler(BadRequestException.class)
+    public ResponseEntity<ApiErrorResponse> handleBadRequestException(
+            BadRequestException ex
+    ) {
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(new ApiErrorResponse(false, ex.getMessage()));
+    }
+
+    /**
+     * Handles IllegalArgumentException (HTTP 400 Bad Request).
+     */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiErrorResponse> handleIllegalArgumentException(
+            IllegalArgumentException ex
+    ) {
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(new ApiErrorResponse(false, ex.getMessage()));
     }
 
     /**

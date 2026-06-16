@@ -20,13 +20,15 @@ public class StockMovementService {
                 .map(movement ->
                         new StockMovementResponse(
                                 movement.getId(),
+                                movement.getIngredient().getId(),
                                 movement.getIngredient().getName(),
                                 movement.getMovementType(),
                                 movement.getQuantity(),
                                 movement.getStockBefore(),
                                 movement.getStockAfter(),
                                 movement.getReferenceNumber(),
-                                movement.getMovementDate()
+                                movement.getMovementDate(),
+                                movement.getCreatedBy()
                         )
                 )
                 .toList();

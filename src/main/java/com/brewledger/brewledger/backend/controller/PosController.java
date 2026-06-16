@@ -11,6 +11,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -18,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/pos")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('KASIR', 'ADMIN')")
+@PreAuthorize("hasAnyRole('KASIR', 'MANAGEMENT')")
 public class PosController {
 
     private final PosService posService;
@@ -33,8 +34,18 @@ public class PosController {
 
     @PostMapping("/checkout")
     public TransactionResponse checkout(
-            @Valid @RequestBody CreateTransactionRequest request
+            @Valid @RequestBody CreateTransactionRequest request,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey
     ) {
-        return transactionService.create(request);
+        return transactionService.create(request, idempotencyKey);
+    }
+
+    public TransactionResponse checkout(CreateTransactionRequest request) {
+        return checkout(request, null);
+    }
+
+    @GetMapping("/summary")
+    public com.brewledger.brewledger.backend.dto.pos.PosSummaryResponse getSummary() {
+        return posService.getSummary();
     }
 }

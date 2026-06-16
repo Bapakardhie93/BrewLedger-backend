@@ -26,6 +26,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final ActivityLogService activityLogService;
 
     @Transactional(readOnly = true)
     public List<UserResponse> getAllUsers() {
@@ -57,9 +58,13 @@ public class UserService {
         user.setRole(role);
         user.setActive(true);
         user.setMustChangePassword(true);
+        user.setPhoneNumber(request.getPhoneNumber());
 
         User savedUser = userRepository.save(user);
         log.info("User created: {}", savedUser.getUsername());
+        activityLogService.record("CREATE_USER", 
+                "Created user: " + savedUser.getUsername() + " (role: " + savedUser.getRole().getName() + ")",
+                "USER", savedUser.getId());
         return mapToResponse(savedUser);
     }
 
@@ -78,6 +83,7 @@ public class UserService {
         user.setFullName(request.getFullName());
         user.setUsername(request.getUsername());
         user.setRole(role);
+        user.setPhoneNumber(request.getPhoneNumber());
 
         if (request.getPassword() != null && !request.getPassword().trim().isEmpty()) {
             user.setPassword(passwordEncoder.encode(request.getPassword()));
@@ -85,6 +91,9 @@ public class UserService {
 
         User updatedUser = userRepository.save(user);
         log.info("User updated: {}", updatedUser.getUsername());
+        activityLogService.record("UPDATE_USER", 
+                "Updated user: " + updatedUser.getUsername() + " (role: " + updatedUser.getRole().getName() + ")",
+                "USER", updatedUser.getId());
         return mapToResponse(updatedUser);
     }
 
@@ -94,6 +103,9 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("User tidak ditemukan"));
         userRepository.delete(user);
         log.info("User deleted with id: {}", id);
+        activityLogService.record("DELETE_USER", 
+                "Deleted user: " + user.getUsername(),
+                "USER", user.getId());
     }
 
     @Transactional
@@ -103,6 +115,9 @@ public class UserService {
         user.setActive(true);
         userRepository.save(user);
         log.info("User activated: {}", user.getUsername());
+        activityLogService.record("ACTIVATE_USER", 
+                "Activated user: " + user.getUsername(),
+                "USER", user.getId());
     }
 
     @Transactional
@@ -112,6 +127,9 @@ public class UserService {
         user.setActive(false);
         userRepository.save(user);
         log.info("User deactivated: {}", user.getUsername());
+        activityLogService.record("DEACTIVATE_USER", 
+                "Deactivated user: " + user.getUsername(),
+                "USER", user.getId());
     }
 
     private UserResponse mapToResponse(User user) {
@@ -121,6 +139,9 @@ public class UserService {
                 user.getRole().getDescription()
         );
 
+        boolean isOnline = user.getLastActivity() != null 
+                && user.getLastActivity().isAfter(java.time.LocalDateTime.now().minusMinutes(5));
+
         return new UserResponse(
                 user.getId(),
                 user.getFullName(),
@@ -128,7 +149,28 @@ public class UserService {
                 user.getActive(),
                 user.getMustChangePassword(),
                 user.getLastLogin(),
+                user.getPhoneNumber(),
+                user.getLastActivity(),
+                isOnline,
                 roleResponse
         );
+    }
+
+    @Transactional
+    public void updateLastActivity(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User tidak ditemukan dengan username: " + username));
+        user.setLastActivity(java.time.LocalDateTime.now());
+        userRepository.save(user);
+    }
+
+    @Transactional(readOnly = true)
+    public List<UserResponse> getOnlineUsers(String role) {
+        java.time.LocalDateTime fiveMinutesAgo = java.time.LocalDateTime.now().minusMinutes(5);
+        return userRepository.findAll().stream()
+                .filter(u -> u.getLastActivity() != null && u.getLastActivity().isAfter(fiveMinutesAgo))
+                .filter(u -> role == null || role.trim().isEmpty() || u.getRole().getName().equalsIgnoreCase(role.trim()))
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 }

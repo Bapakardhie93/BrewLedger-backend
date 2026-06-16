@@ -19,13 +19,13 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/stock-requests")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('ADMIN', 'MANAGEMENT', 'GUDANG')")
+@PreAuthorize("hasAnyRole('MANAGEMENT', 'GUDANG')")
 public class StockRequestController {
 
     private final StockRequestService stockRequestService;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGEMENT')")
+    @PreAuthorize("hasAnyRole('MANAGEMENT', 'GUDANG')")
     public StockRequestResponse create(
             @Valid @RequestBody CreateStockRequest request
     ) {
@@ -33,19 +33,38 @@ public class StockRequestController {
     }
 
     @GetMapping
+    public List<StockRequestResponse> findAll(
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String targetRole
+    ) {
+        return stockRequestService.findAll(targetRole);
+    }
+
     public List<StockRequestResponse> findAll() {
-        return stockRequestService.findAll();
+        return findAll(null);
     }
 
     @PatchMapping("/{id}/process")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GUDANG')")
+    @PreAuthorize("hasAnyRole('MANAGEMENT', 'GUDANG')")
     public StockRequestResponse process(@PathVariable Long id) {
         return stockRequestService.process(id);
     }
 
     @PatchMapping("/{id}/complete")
-    @PreAuthorize("hasAnyRole('ADMIN', 'GUDANG')")
+    @PreAuthorize("hasAnyRole('MANAGEMENT', 'GUDANG')")
     public StockRequestResponse complete(@PathVariable Long id) {
         return stockRequestService.complete(id);
+    }
+
+    @PatchMapping("/{id}/reject")
+    @PreAuthorize("hasAnyRole('MANAGEMENT', 'GUDANG')")
+    public StockRequestResponse reject(
+            @PathVariable Long id,
+            @RequestBody com.brewledger.brewledger.backend.dto.approval.RejectApprovalRequest request
+    ) {
+        String effectiveReason = request.getEffectiveReason();
+        if (effectiveReason.isEmpty()) {
+            throw new com.brewledger.brewledger.backend.exception.BusinessException("Alasan penolakan (reason/rejectReason) wajib diisi");
+        }
+        return stockRequestService.reject(id, effectiveReason);
     }
 }

@@ -29,6 +29,10 @@ public class Transaction extends BaseEntity {
     @Enumerated(EnumType.STRING)
     private PaymentStatus paymentStatus;
 
+    private Double discountAmount = 0.0;
+
+    private String discountNotes;
+
     private Double subtotal;
 
     private Double tax;
@@ -36,4 +40,15 @@ public class Transaction extends BaseEntity {
     private Double total;
 
     private String notes;
+
+    private String customerName;
+
+    private String tableNumber;
+
+    private Double cashReceived;
+
+    private Double changeAmount;
+
+    @Column(name = "idempotency_key", unique = true)
+    private String idempotencyKey;
 }

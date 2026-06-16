@@ -31,4 +31,6 @@ public class StockMovement extends BaseEntity {
     private String referenceNumber;
 
     private LocalDateTime movementDate;
+
+    private String createdBy;
 }

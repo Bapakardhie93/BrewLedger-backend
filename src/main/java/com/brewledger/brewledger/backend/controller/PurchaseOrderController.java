@@ -15,7 +15,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/purchase-orders")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('ADMIN', 'MANAGEMENT', 'GUDANG')")
+@PreAuthorize("hasAnyRole('MANAGEMENT', 'GUDANG')")
 public class PurchaseOrderController {
 
     private final PurchaseOrderService service;
@@ -36,7 +36,7 @@ public class PurchaseOrderController {
     }
 
     @PostMapping("/{id}/receive")
-    @PreAuthorize("hasAnyRole('GUDANG', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('GUDANG', 'MANAGEMENT')")
     public PurchaseOrderResponse receive(
             @PathVariable Long id
     ) {
@@ -45,7 +45,7 @@ public class PurchaseOrderController {
     }
 
     @PostMapping("/{id}/items")
-    @PreAuthorize("hasAnyRole('GUDANG', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('GUDANG', 'MANAGEMENT')")
     public PurchaseOrderItemResponse addItem(
             @PathVariable Long id,
             @Valid
@@ -59,7 +59,7 @@ public class PurchaseOrderController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('GUDANG', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('GUDANG', 'MANAGEMENT')")
     public PurchaseOrderResponse create(
             @Valid
             @RequestBody CreatePurchaseOrderRequest request
@@ -69,7 +69,7 @@ public class PurchaseOrderController {
     }
 
     @PostMapping("/{id}/submit")
-    @PreAuthorize("hasAnyRole('GUDANG', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('GUDANG', 'MANAGEMENT')")
     public PurchaseOrderResponse submitForApproval(@PathVariable Long id) {
         return service.submitForApproval(id);
     }

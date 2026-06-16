@@ -15,4 +15,6 @@ public class CreateTransactionItemRequest {
     @NotNull
     @Positive
     private Integer quantity;
+
+    private String notes;
 }

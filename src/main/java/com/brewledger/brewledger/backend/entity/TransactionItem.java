@@ -25,4 +25,10 @@ public class TransactionItem extends BaseEntity {
     private Double unitPrice;
 
     private Double subtotal;
+
+    private Double costPrice = 0.0;
+
+    private Double subtotalCost = 0.0;
+
+    private String notes;
 }
