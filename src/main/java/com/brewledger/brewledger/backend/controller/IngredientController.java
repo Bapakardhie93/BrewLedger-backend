@@ -24,7 +24,7 @@ public class IngredientController {
 
     @PostMapping("/submit-new")
     @PreAuthorize("hasAnyRole('MANAGEMENT')")
-    public com.brewledger.brewledger.backend.dto.approval.ApprovalResponse submitNewIngredient(
+    public com.brewledger.brewledger.backend.dto.warehouse.ApprovalResponse submitNewIngredient(
             @Valid @RequestBody CreateIngredientRequest request
     ) {
         return approvalRequestService.submitNewIngredient(request);

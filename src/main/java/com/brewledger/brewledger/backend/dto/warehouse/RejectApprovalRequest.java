@@ -1,12 +1,17 @@
-package com.brewledger.brewledger.backend.dto.approval;
+package com.brewledger.brewledger.backend.dto.warehouse;
 
-import lombok.Setter;
-
-@Setter
 public class RejectApprovalRequest {
 
     private String rejectReason;
     private String reason;
+
+    public void setRejectReason(String rejectReason) {
+        this.rejectReason = rejectReason;
+    }
+
+    public void setReason(String reason) {
+        this.reason = reason;
+    }
 
     public String getRejectReason() {
         if (rejectReason != null && !rejectReason.trim().isEmpty()) {

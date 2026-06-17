@@ -66,25 +66,30 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 SecurityContextHolder.getContext()
                         .getAuthentication() == null) {
 
-            UserDetails userDetails =
-                    userDetailsService.loadUserByUsername(
-                            username
-                    );
+            try {
+                UserDetails userDetails =
+                        userDetailsService.loadUserByUsername(
+                                username
+                        );
 
-            UsernamePasswordAuthenticationToken authToken =
-                    new UsernamePasswordAuthenticationToken(
-                            userDetails,
-                            null,
-                            userDetails.getAuthorities()
-                    );
+                UsernamePasswordAuthenticationToken authToken =
+                        new UsernamePasswordAuthenticationToken(
+                                userDetails,
+                                null,
+                                userDetails.getAuthorities()
+                        );
 
-            authToken.setDetails(
-                    new WebAuthenticationDetailsSource()
-                            .buildDetails(request)
-            );
+                authToken.setDetails(
+                        new WebAuthenticationDetailsSource()
+                                .buildDetails(request)
+                );
 
-            SecurityContextHolder.getContext()
-                    .setAuthentication(authToken);
+                SecurityContextHolder.getContext()
+                        .setAuthentication(authToken);
+            } catch (org.springframework.security.core.userdetails.UsernameNotFoundException e) {
+                // If user is not found, clear authentication context to let Spring Security handle it
+                SecurityContextHolder.clearContext();
+            }
         }
 
         filterChain.doFilter(request, response);

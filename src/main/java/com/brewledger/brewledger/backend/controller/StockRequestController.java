@@ -59,7 +59,7 @@ public class StockRequestController {
     @PreAuthorize("hasAnyRole('MANAGEMENT', 'GUDANG')")
     public StockRequestResponse reject(
             @PathVariable Long id,
-            @RequestBody com.brewledger.brewledger.backend.dto.approval.RejectApprovalRequest request
+            @RequestBody com.brewledger.brewledger.backend.dto.warehouse.RejectApprovalRequest request
     ) {
         String effectiveReason = request.getEffectiveReason();
         if (effectiveReason.isEmpty()) {

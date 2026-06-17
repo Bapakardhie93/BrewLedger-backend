@@ -289,6 +289,16 @@ Authorization: Bearer <JWT_TOKEN>
 ### CRUD User (Hanya MANAGEMENT)
 Mutasi user seperti membuat, mengubah, menghapus, mengaktifkan, dan menonaktifkan dibatasi hanya untuk role `MANAGEMENT`.
 
+> [!IMPORTANT]
+> **Batasan Peran Pengguna (Role Constraints)**:
+> Sistem secara ketat hanya mendukung 3 peran bawaan: `MANAGEMENT`, `GUDANG`, dan `KASIR`. Upaya untuk membuat atau memperbarui user dengan role lain akan ditolak dengan error `400 Bad Request` dan pesan:
+> ```json
+> {
+>   "success": false,
+>   "message": "Role tidak valid. Hanya role KASIR, GUDANG, dan MANAGEMENT yang diizinkan."
+> }
+> ```
+
 ```http
 POST /api/users
 Authorization: Bearer <JWT_TOKEN>

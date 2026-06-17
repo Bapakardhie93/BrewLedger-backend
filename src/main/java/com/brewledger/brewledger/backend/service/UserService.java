@@ -50,6 +50,7 @@ public class UserService {
 
         Role role = roleRepository.findById(request.getRoleId())
                 .orElseThrow(() -> new ResourceNotFoundException("Role tidak ditemukan"));
+        validateRoleConstraint(role);
 
         User user = new User();
         user.setFullName(request.getFullName());
@@ -79,6 +80,7 @@ public class UserService {
 
         Role role = roleRepository.findById(request.getRoleId())
                 .orElseThrow(() -> new ResourceNotFoundException("Role tidak ditemukan"));
+        validateRoleConstraint(role);
 
         user.setFullName(request.getFullName());
         user.setUsername(request.getUsername());
@@ -130,6 +132,12 @@ public class UserService {
         activityLogService.record("DEACTIVATE_USER", 
                 "Deactivated user: " + user.getUsername(),
                 "USER", user.getId());
+    }
+
+    private void validateRoleConstraint(Role role) {
+        if (role == null || !List.of("MANAGEMENT", "GUDANG", "KASIR").contains(role.getName())) {
+            throw new IllegalArgumentException("Role tidak valid. Hanya role KASIR, GUDANG, dan MANAGEMENT yang diizinkan.");
+        }
     }
 
     private UserResponse mapToResponse(User user) {

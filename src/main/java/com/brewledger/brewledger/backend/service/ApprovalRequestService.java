@@ -1,7 +1,7 @@
 package com.brewledger.brewledger.backend.service;
 
-import com.brewledger.brewledger.backend.dto.approval.ApprovalResponse;
-import com.brewledger.brewledger.backend.dto.approval.RejectApprovalRequest;
+import com.brewledger.brewledger.backend.dto.warehouse.ApprovalResponse;
+import com.brewledger.brewledger.backend.dto.warehouse.RejectApprovalRequest;
 import com.brewledger.brewledger.backend.dto.warehouse.StockAdjustmentRequest;
 import com.brewledger.brewledger.backend.entity.ApprovalRequest;
 import com.brewledger.brewledger.backend.entity.User;

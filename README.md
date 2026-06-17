@@ -76,7 +76,7 @@ Backend REST API untuk BrewLedger, aplikasi Point of Sale (POS), manajemen inven
 
 | Komponen | Teknologi |
 |---|---|
-| Bahasa | Java 25 |
+| Bahasa | Java 21+ |
 | Framework | Spring Boot 3.5.x |
 | Database | PostgreSQL (Supabase / Local) |
 | ORM | Spring Data JPA / Hibernate |
@@ -112,8 +112,8 @@ Database (PostgreSQL)
 
 ## Prasyarat
 
-- Java Development Kit (JDK) 25.
-- PostgreSQL Database.
+- Java Development Kit (JDK) 21 atau lebih baru.
+- PostgreSQL Database untuk profile `prod`.
 - Maven (opsional, sudah disediakan Maven Wrapper `./mvnw`).
 
 Periksa versi Java Anda:
@@ -125,7 +125,7 @@ java -version
 
 ## Konfigurasi
 
-Aplikasi membaca parameter konfigurasi melalui file `.env` di root direktori proyek. Salin contoh di bawah ini dan sesuaikan dengan environment Anda:
+Secara default aplikasi berjalan dengan profile `dev` dan memakai H2 lokal di folder `data/`, sehingga server bisa start tanpa PostgreSQL. Untuk production, aktifkan profile `prod`; aplikasi akan membaca parameter konfigurasi melalui file `.env` di root direktori proyek. Salin contoh di bawah ini dan sesuaikan dengan environment Anda:
 
 ```properties
 DB_URL=jdbc:postgresql://localhost:5432/brewledger
@@ -155,6 +155,16 @@ Jalankan perintah berikut pada terminal di root direktori proyek:
 Aplikasi akan berjalan di port `8081` secara default:
 ```text
 http://localhost:8081
+```
+
+Jika port `8081` sedang dipakai, jalankan dengan port lain:
+```bash
+SERVER_PORT=18081 ./mvnw spring-boot:run
+```
+
+Profile `dev` otomatis memakai database lokal H2. Untuk memaksa koneksi PostgreSQL lokal/Supabase saat development, jalankan dengan profile `prod` dan pastikan `.env` berisi `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `ADMIN_*`, dan `JWT_SECRET` yang benar:
+```bash
+SPRING_PROFILES_ACTIVE=prod ./mvnw spring-boot:run
 ```
 
 ### Verifikasi Login
@@ -250,6 +260,7 @@ src/
 │   │   └── service/         # Logika Bisnis Utama (Core Services)
 │   └── resources/
 │       ├── application.properties
+│       ├── application-dev.properties
 │       └── application-prod.properties
 └── test/
     └── java/com/brewledger/brewledger/backend/

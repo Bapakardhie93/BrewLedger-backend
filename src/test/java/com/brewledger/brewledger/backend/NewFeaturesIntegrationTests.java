@@ -1,8 +1,8 @@
 package com.brewledger.brewledger.backend;
 
 import com.brewledger.brewledger.backend.controller.*;
-import com.brewledger.brewledger.backend.dto.approval.ApprovalResponse;
-import com.brewledger.brewledger.backend.dto.approval.RejectApprovalRequest;
+import com.brewledger.brewledger.backend.dto.warehouse.ApprovalResponse;
+import com.brewledger.brewledger.backend.dto.warehouse.RejectApprovalRequest;
 import com.brewledger.brewledger.backend.dto.auth.ChangePasswordRequest;
 import com.brewledger.brewledger.backend.dto.kitchen.KitchenOrderResponse;
 import com.brewledger.brewledger.backend.dto.shift.CashierShiftResponse;
@@ -1093,7 +1093,7 @@ class NewFeaturesIntegrationTests {
         com.brewledger.brewledger.backend.dto.warehouse.StockAdjustmentRequest adj = new com.brewledger.brewledger.backend.dto.warehouse.StockAdjustmentRequest();
         adj.setNewStock(500.0);
         adj.setReason("Testing conflict");
-        com.brewledger.brewledger.backend.dto.approval.ApprovalResponse resp = approvalRequestService.submitStockAdjustment(ingredient.getId(), adj);
+        com.brewledger.brewledger.backend.dto.warehouse.ApprovalResponse resp = approvalRequestService.submitStockAdjustment(ingredient.getId(), adj);
 
         // Approve once
         authenticateAs(adminUser);
@@ -1105,7 +1105,7 @@ class NewFeaturesIntegrationTests {
                 .hasMessageContaining("Hanya pengajuan PENDING");
 
         // Reject also throws ConflictException
-        com.brewledger.brewledger.backend.dto.approval.RejectApprovalRequest rejectReq = new com.brewledger.brewledger.backend.dto.approval.RejectApprovalRequest();
+        com.brewledger.brewledger.backend.dto.warehouse.RejectApprovalRequest rejectReq = new com.brewledger.brewledger.backend.dto.warehouse.RejectApprovalRequest();
         rejectReq.setReason("Reject test");
         assertThatThrownBy(() -> approvalRequestController.rejectRequest(resp.getId(), rejectReq))
                 .isInstanceOf(ConflictException.class)
@@ -1176,6 +1176,32 @@ class NewFeaturesIntegrationTests {
         assertThat(health.get("status")).isEqualTo("UP");
         assertThat(health.get("database")).isEqualTo("UP");
         assertThat(health.get("timestamp")).isNotNull();
+    }
+
+    @Test
+    void testCreateUserWithInvalidRoleConstraint() {
+        authenticateAs(adminUser);
+
+        // Create a custom temporary role in the database that is not one of the allowed 3 roles
+        Role invalidRole = new Role();
+        invalidRole.setName("SUPER_ADMIN");
+        invalidRole.setDescription("Super Admin Role");
+        invalidRole = roleRepository.save(invalidRole);
+
+        com.brewledger.brewledger.backend.dto.user.CreateUserRequest userReq = new com.brewledger.brewledger.backend.dto.user.CreateUserRequest();
+        userReq.setFullName("Super Admin User");
+        userReq.setUsername("superadmin");
+        userReq.setPassword("password");
+        userReq.setRoleId(invalidRole.getId());
+        userReq.setPhoneNumber("08123456780");
+
+        final Long roleId = invalidRole.getId();
+        assertThatThrownBy(() -> userController.createUser(userReq))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Role tidak valid. Hanya role KASIR, GUDANG, dan MANAGEMENT yang diizinkan.");
+                
+        // Cleanup the test role
+        roleRepository.delete(invalidRole);
     }
 
     private void authenticateAs(User user) {
