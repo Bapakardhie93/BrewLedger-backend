@@ -2,8 +2,10 @@ package com.brewledger.brewledger.backend.dto.transaction;
 
 import com.brewledger.brewledger.backend.enums.PaymentMethod;
 import com.brewledger.brewledger.backend.enums.TransactionType;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -21,6 +23,7 @@ public class CreateTransactionRequest {
 
     private String notes;
 
+    @PositiveOrZero
     private Double discountAmount;
 
     private String discountNotes;
@@ -29,8 +32,9 @@ public class CreateTransactionRequest {
 
     private String tableNumber;
 
+    @PositiveOrZero
     private Double cashReceived;
 
     @NotEmpty
-    private List<CreateTransactionItemRequest> items;
+    private List<@NotNull @Valid CreateTransactionItemRequest> items;
 }

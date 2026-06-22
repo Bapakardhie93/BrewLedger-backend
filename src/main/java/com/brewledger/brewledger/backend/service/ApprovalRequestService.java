@@ -24,6 +24,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ApprovalRequestService {
 
+    private static final String ROLE_MANAGEMENT = "MANAGEMENT";
+    private static final String ROLE_GUDANG = "GUDANG";
+
     private final ApprovalRequestRepository approvalRequestRepository;
     private final CurrentUserService currentUserService;
     private final ObjectMapper objectMapper;
@@ -62,13 +65,14 @@ public class ApprovalRequestService {
     @Transactional
     public ApprovalResponse submitStockAdjustment(Long ingredientId, StockAdjustmentRequest request) {
         User requester = currentUserService.requireCurrentUser();
+        String requesterRole = getRoleName(requester);
         ApprovalRequest approval = new ApprovalRequest();
         approval.setRequestNumber("APR-STK-" + System.currentTimeMillis());
         approval.setType(ApprovalType.STOCK_ADJUSTMENT);
         approval.setStatus(ApprovalStatus.PENDING);
         approval.setRequestedBy(requester);
-        approval.setRequestedByRole(requester.getRole().getName());
-        approval.setTargetRole("MANAGEMENT");
+        approval.setRequestedByRole(requesterRole);
+        approval.setTargetRole(resolveCounterpartRole(requesterRole));
         approval.setReferenceId(ingredientId);
         approval.setReason(request.getReason());
 
@@ -87,6 +91,7 @@ public class ApprovalRequestService {
     @Transactional
     public ApprovalResponse submitNewIngredient(com.brewledger.brewledger.backend.dto.ingredient.CreateIngredientRequest request) {
         User requester = currentUserService.requireCurrentUser();
+        String requesterRole = getRoleName(requester);
         
         if (ingredientRepository.existsByCode(request.getCode())) {
             throw new BusinessException("Kode ingredient sudah digunakan: " + request.getCode());
@@ -97,8 +102,8 @@ public class ApprovalRequestService {
         approval.setType(ApprovalType.NEW_INGREDIENT);
         approval.setStatus(ApprovalStatus.PENDING);
         approval.setRequestedBy(requester);
-        approval.setRequestedByRole(requester.getRole().getName());
-        approval.setTargetRole("GUDANG");
+        approval.setRequestedByRole(requesterRole);
+        approval.setTargetRole(ROLE_GUDANG);
         approval.setReason("Pengajuan bahan baku baru: " + request.getName());
 
         try {
@@ -117,13 +122,14 @@ public class ApprovalRequestService {
     @Transactional
     public ApprovalResponse submitVoidTransaction(Long transactionId, String reason) {
         User requester = currentUserService.requireCurrentUser();
+        String requesterRole = getRoleName(requester);
         ApprovalRequest approval = new ApprovalRequest();
         approval.setRequestNumber("APR-VOID-" + System.currentTimeMillis());
         approval.setType(ApprovalType.VOID_TRANSACTION);
         approval.setStatus(ApprovalStatus.PENDING);
         approval.setRequestedBy(requester);
-        approval.setRequestedByRole(requester.getRole().getName());
-        approval.setTargetRole("MANAGEMENT");
+        approval.setRequestedByRole(requesterRole);
+        approval.setTargetRole(resolveCounterpartRole(requesterRole));
         approval.setReferenceId(transactionId);
         approval.setReason(reason);
 
@@ -141,30 +147,41 @@ public class ApprovalRequestService {
             throw new org.springframework.security.access.AccessDeniedException("Anda tidak memiliki izin untuk memproses pengajuan ini.");
         }
 
-        // 2. Jika pengajuan dibuat oleh MANAGEMENT: target role harus GUDANG
-        if (requester != null && requester.getRole() != null && requester.getRole().getName().equalsIgnoreCase("MANAGEMENT")) {
-            if (!approver.getRole().getName().equalsIgnoreCase("GUDANG")) {
-                throw new org.springframework.security.access.AccessDeniedException("Anda tidak memiliki izin untuk memproses pengajuan ini.");
-            }
+        String requiredRole = approval.getTargetRole();
+        if (requiredRole == null || requiredRole.trim().isEmpty()) {
+            requiredRole = defaultTargetRoleForType(approval);
         }
-        // 3. Jika pengajuan dibuat oleh GUDANG: target role harus MANAGEMENT
-        else if (requester != null && requester.getRole() != null && requester.getRole().getName().equalsIgnoreCase("GUDANG")) {
-            if (!approver.getRole().getName().equalsIgnoreCase("MANAGEMENT")) {
-                throw new org.springframework.security.access.AccessDeniedException("Anda tidak memiliki izin untuk memproses pengajuan ini.");
-            }
+
+        if (!requiredRole.equalsIgnoreCase(getRoleName(approver))) {
+            throw new org.springframework.security.access.AccessDeniedException("Anda tidak memiliki izin untuk memproses pengajuan ini.");
         }
-        // 4. Aturan default fallback berdasarkan tipe pengajuan (misal dibuat oleh KASIR)
-        else {
-            if (approval.getType() == ApprovalType.NEW_INGREDIENT) {
-                if (!approver.getRole().getName().equalsIgnoreCase("GUDANG")) {
-                    throw new org.springframework.security.access.AccessDeniedException("Anda tidak memiliki izin untuk memproses pengajuan ini.");
-                }
-            } else {
-                if (!approver.getRole().getName().equalsIgnoreCase("MANAGEMENT")) {
-                    throw new org.springframework.security.access.AccessDeniedException("Anda tidak memiliki izin untuk memproses pengajuan ini.");
-                }
-            }
+    }
+
+    private String getRoleName(User user) {
+        if (user == null || user.getRole() == null || user.getRole().getName() == null) {
+            throw new org.springframework.security.access.AccessDeniedException("Anda tidak memiliki izin untuk memproses pengajuan ini.");
         }
+        return user.getRole().getName();
+    }
+
+    private String resolveCounterpartRole(String requesterRole) {
+        if (ROLE_MANAGEMENT.equalsIgnoreCase(requesterRole)) {
+            return ROLE_GUDANG;
+        }
+        if (ROLE_GUDANG.equalsIgnoreCase(requesterRole)) {
+            return ROLE_MANAGEMENT;
+        }
+        return ROLE_MANAGEMENT;
+    }
+
+    private String defaultTargetRoleForType(ApprovalRequest approval) {
+        if (approval.getType() == ApprovalType.NEW_INGREDIENT) {
+            return ROLE_GUDANG;
+        }
+        if (approval.getRequestedByRole() != null && !approval.getRequestedByRole().trim().isEmpty()) {
+            return resolveCounterpartRole(approval.getRequestedByRole());
+        }
+        return ROLE_MANAGEMENT;
     }
 
     @Transactional

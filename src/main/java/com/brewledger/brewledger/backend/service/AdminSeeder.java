@@ -42,7 +42,7 @@ public class AdminSeeder implements CommandLineRunner {
     @Override
     public void run(String... args) {
 
-        // 1. Seed env admin user if configured
+        // Seed the configured bootstrap management user.
         if (adminUsername != null && !adminUsername.trim().isEmpty() && !userRepository.existsByUsername(adminUsername)) {
             Role adminRole = roleRepository.findByName("MANAGEMENT")
                     .orElseThrow(() ->
@@ -54,58 +54,10 @@ public class AdminSeeder implements CommandLineRunner {
                     passwordEncoder.encode(adminPassword)
             );
             admin.setActive(true);
-            admin.setMustChangePassword(true);
+            admin.setMustChangePassword(false);
             admin.setRole(adminRole);
             userRepository.save(admin);
             log.info("Default admin from env created with username: {}", adminUsername);
-        }
-
-        // 2. Seed default admin user
-        if (!userRepository.existsByUsername("admin")) {
-            Role adminRole = roleRepository.findByName("MANAGEMENT")
-                    .orElseThrow(() ->
-                            new RuntimeException("Role MANAGEMENT tidak ditemukan"));
-            User admin = new User();
-            admin.setFullName("Default Admin");
-            admin.setUsername("admin");
-            admin.setPassword(passwordEncoder.encode("admin12345"));
-            admin.setActive(true);
-            admin.setMustChangePassword(true);
-            admin.setRole(adminRole);
-            userRepository.save(admin);
-            log.info("Default admin user created");
-        }
-
-        // 3. Seed default gudang user
-        if (!userRepository.existsByUsername("gudang")) {
-            Role role = roleRepository.findByName("GUDANG")
-                    .orElseThrow(() ->
-                            new RuntimeException("Role GUDANG tidak ditemukan"));
-            User user = new User();
-            user.setFullName("Default Gudang");
-            user.setUsername("gudang");
-            user.setPassword(passwordEncoder.encode("gudang12345"));
-            user.setActive(true);
-            user.setMustChangePassword(true);
-            user.setRole(role);
-            userRepository.save(user);
-            log.info("Default gudang user created");
-        }
-
-        // 4. Seed default kasir user
-        if (!userRepository.existsByUsername("kasir")) {
-            Role role = roleRepository.findByName("KASIR")
-                    .orElseThrow(() ->
-                            new RuntimeException("Role KASIR tidak ditemukan"));
-            User user = new User();
-            user.setFullName("Default Kasir");
-            user.setUsername("kasir");
-            user.setPassword(passwordEncoder.encode("kasir12345"));
-            user.setActive(true);
-            user.setMustChangePassword(true);
-            user.setRole(role);
-            userRepository.save(user);
-            log.info("Default kasir user created");
         }
     }
 }

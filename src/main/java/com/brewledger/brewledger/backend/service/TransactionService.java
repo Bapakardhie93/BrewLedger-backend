@@ -69,6 +69,19 @@ public class TransactionService {
             throw new BusinessException("Transaksi harus memiliki minimal 1 item");
         }
 
+        if (request.getDiscountAmount() != null && request.getDiscountAmount() < 0.0) {
+            throw new BusinessException("Diskon tidak boleh bernilai negatif");
+        }
+
+        for (CreateTransactionItemRequest item : request.getItems()) {
+            if (item == null || item.getProductId() == null) {
+                throw new BusinessException("Setiap item transaksi wajib memiliki productId");
+            }
+            if (item.getQuantity() == null || item.getQuantity() <= 0) {
+                throw new BusinessException("Quantity item transaksi harus lebih besar dari 0");
+            }
+        }
+
         User currentUser = currentUserService.requireCurrentUser();
 
         // Cashier shift check for KASIR role checkout requests
@@ -225,6 +238,9 @@ public class TransactionService {
         // Compute cashReceived and changeAmount
         if (request.getPaymentMethod() == com.brewledger.brewledger.backend.enums.PaymentMethod.CASH) {
             double cashReceived = request.getCashReceived() != null ? request.getCashReceived() : 0.0;
+            if (cashReceived < 0.0) {
+                throw new BusinessException("Uang tunai yang diterima (cashReceived) tidak boleh negatif");
+            }
             if (cashReceived < total) {
                 throw new BusinessException("Uang tunai yang diterima (cashReceived) kurang dari total transaksi. Total: Rp" + total + ", Diterima: Rp" + cashReceived);
             }
@@ -435,7 +451,7 @@ public class TransactionService {
         }
 
         approvalRequestService.submitVoidTransaction(id, "Permintaan pembatalan transaksi " + transaction.getTransactionNumber());
-        throw new BusinessException("Pengajuan void transaksi berhasil diajukan dengan status PENDING dan memerlukan persetujuan MANAGEMENT.");
+        throw new BusinessException("Pengajuan void transaksi berhasil diajukan dengan status PENDING dan memerlukan persetujuan role lain yang berwenang.");
     }
 
     @Transactional

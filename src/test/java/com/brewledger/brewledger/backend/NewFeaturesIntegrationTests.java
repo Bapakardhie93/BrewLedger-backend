@@ -386,6 +386,8 @@ class NewFeaturesIntegrationTests {
                 .findFirst()
                 .orElseThrow();
         assertThat(voidApproval.getStatus()).isEqualTo("PENDING");
+        assertThat(voidApproval.getRequestedByRole()).isEqualTo("MANAGEMENT");
+        assertThat(voidApproval.getTargetRole()).isEqualTo("GUDANG");
 
         // Approve VOID
         authenticateAs(gudangUser);
@@ -417,6 +419,8 @@ class NewFeaturesIntegrationTests {
                 .findFirst()
                 .orElseThrow();
         assertThat(stockApproval.getStatus()).isEqualTo("PENDING");
+        assertThat(stockApproval.getRequestedByRole()).isEqualTo("GUDANG");
+        assertThat(stockApproval.getTargetRole()).isEqualTo("MANAGEMENT");
 
         // Approve Stock Adjustment
         authenticateAs(adminUser);
@@ -426,6 +430,39 @@ class NewFeaturesIntegrationTests {
         // Verify stock is adjusted
         Ingredient adjustedIngredient = ingredientRepository.findById(ingredient.getId()).orElseThrow();
         assertThat(adjustedIngredient.getCurrentStock()).isEqualTo(500.0);
+    }
+
+    @Test
+    void managementStockAdjustmentRequiresGudangApproval() {
+        authenticateAs(adminUser);
+        StockAdjustmentRequest adjRequest = new StockAdjustmentRequest();
+        adjRequest.setNewStock(750.0);
+        adjRequest.setReason("Koreksi stok oleh manajemen");
+
+        assertThatThrownBy(() -> warehouseController.adjustStock(ingredient.getId(), adjRequest))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Pengajuan penyesuaian stok berhasil diajukan");
+
+        ApprovalResponse stockApproval = approvalRequestController.findAll().stream()
+                .filter(a -> a.getType().equals("STOCK_ADJUSTMENT")
+                        && a.getReferenceId().equals(ingredient.getId())
+                        && a.getStatus().equals("PENDING"))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(stockApproval.getRequestedByRole()).isEqualTo("MANAGEMENT");
+        assertThat(stockApproval.getTargetRole()).isEqualTo("GUDANG");
+
+        assertThatThrownBy(() -> approvalRequestController.approveRequest(stockApproval.getId()))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class)
+                .hasMessageContaining("Anda tidak memiliki izin untuk memproses pengajuan ini.");
+
+        authenticateAs(gudangUser);
+        ApprovalResponse approved = approvalRequestController.approveRequest(stockApproval.getId());
+        assertThat(approved.getStatus()).isEqualTo("APPROVED");
+
+        Ingredient adjustedIngredient = ingredientRepository.findById(ingredient.getId()).orElseThrow();
+        assertThat(adjustedIngredient.getCurrentStock()).isEqualTo(750.0);
     }
 
     @Test
@@ -658,6 +695,8 @@ class NewFeaturesIntegrationTests {
                 .findFirst()
                 .orElseThrow();
         assertThat(voidApproval.getStatus()).isEqualTo("PENDING");
+        assertThat(voidApproval.getRequestedByRole()).isEqualTo("MANAGEMENT");
+        assertThat(voidApproval.getTargetRole()).isEqualTo("GUDANG");
 
         // Step 3: adminUser (who requested it) attempts to approve or reject their own request.
         // It must throw AccessDeniedException (403 Forbidden).
@@ -698,6 +737,8 @@ class NewFeaturesIntegrationTests {
                 .filter(a -> a.getType().equals("STOCK_ADJUSTMENT") && a.getReferenceId().equals(ingredient.getId()) && a.getStatus().equals("PENDING"))
                 .findFirst()
                 .orElseThrow();
+        assertThat(stockApproval.getRequestedByRole()).isEqualTo("GUDANG");
+        assertThat(stockApproval.getTargetRole()).isEqualTo("MANAGEMENT");
 
         // Step 6: gudangUser (who requested it) attempts to approve/reject.
         // It must throw AccessDeniedException.

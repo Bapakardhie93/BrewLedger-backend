@@ -112,8 +112,11 @@ Content-Type: application/json
 | `GET` | `/api/approvals/{id}` | MANAGEMENT/GUDANG | Detail pengajuan approval |
 | `POST` | `/api/approvals/{id}/approve` | MANAGEMENT/GUDANG | Setujui pengajuan terpusat |
 | `POST` | `/api/approvals/{id}/reject` | MANAGEMENT/GUDANG | Tolak pengajuan terpusat |
+| `GET` | `/api/approvals/purchase-orders` | MANAGEMENT | Daftar pending Purchase Order untuk diapprove |
+| `POST` | `/api/approvals/purchase-orders/{id}/approve` | MANAGEMENT | Setujui pengajuan Purchase Order |
+| `POST` | `/api/approvals/purchase-orders/{id}/reject` | MANAGEMENT | Tolak pengajuan Purchase Order |
 | **Categories & Products** | | | |
-| `GET` | `/api/categories` | Login | Daftar kategori produk |
+| `GET` | `/api/categories` | MANAGEMENT | Daftar kategori produk |
 | `POST` | `/api/categories` | MANAGEMENT | Buat kategori |
 | `PUT` | `/api/categories/{id}` | MANAGEMENT | Perbarui kategori |
 | `DELETE` | `/api/categories/{id}` | MANAGEMENT | Hapus kategori |
@@ -126,6 +129,12 @@ Content-Type: application/json
 | `DELETE` | `/api/products/{id}` | MANAGEMENT | Hapus produk |
 | `PATCH` | `/api/products/{id}/activate` | MANAGEMENT | Aktifkan produk |
 | `PATCH` | `/api/products/{id}/deactivate` | MANAGEMENT | Nonaktifkan produk |
+
+Kategori produk default dibuat otomatis saat backend start: `Makanan Berat`, `Makanan Ringan`, `Kopi`, `Non Kopi`, `Teh`, `Dessert`, `Paket/Bundling`, dan `Merchandise`.
+
+| **Dashboard** | | | |
+| `GET` | `/api/dashboard` | MANAGEMENT | Metrik dashboard ringkasan eksekutif |
+| `GET` | `/api/dashboard/best-products` | MANAGEMENT | Daftar produk terlaris |
 | **Reports & Audit Trail** | | | |
 | `GET` | `/api/stock-movements` | MANAGEMENT/GUDANG | Audit historis pergerakan stok |
 | `GET` | `/api/reports/sales` | MANAGEMENT | Laporan keuangan & analisa penjualan |
@@ -662,11 +671,13 @@ Content-Type: application/json
 
 ---
 
-## 8. Persetujuan Terpusat (Centralized Approvals)
+## 8. Persetujuan Terpusat & Purchase Orders Approval
 
-Menampung seluruh perizinan transaksi sensitif (seperti void transaksi, penyesuaian stok manual, atau pengajuan bahan baku baru) ke dalam satu wadah persetujuan terpusat.
+Menampung seluruh perizinan transaksi sensitif (seperti void transaksi, penyesuaian stok manual, atau pengajuan bahan baku baru) ke dalam satu wadah persetujuan terpusat, serta alur persetujuan pemesanan pembelian (Purchase Order) oleh pihak manajemen.
 
-### Daftar Pengajuan Approval (dengan filter targetRole)
+### A. Persetujuan Terpusat (General Approvals)
+
+#### Daftar Pengajuan Approval (dengan filter targetRole)
 Mendapatkan semua pengajuan approval terpusat, dengan filter penerima (`targetRole`).
 
 ```http
@@ -674,7 +685,7 @@ GET /api/approvals?targetRole=GUDANG
 Authorization: Bearer <JWT_TOKEN>
 ```
 
-#### Response `200 OK`:
+##### Response `200 OK`:
 * `requestedByRole`: Peran dari pembuat pengajuan.
 * `targetRole`: Peran dari penerima pengajuan yang wajib memproses.
 ```json
@@ -697,6 +708,96 @@ Authorization: Bearer <JWT_TOKEN>
     "requestedAt": "2026-06-16T23:10:15"
   }
 ]
+```
+
+### B. Purchase Orders Approval (Hanya MANAGEMENT)
+
+Digunakan oleh manajemen untuk meninjau, menyetujui, atau menolak dokumen Purchase Order (PO) yang diajukan oleh staf gudang.
+
+#### 1. Daftar Pending Purchase Order
+Mengambil semua dokumen Purchase Order yang sedang berstatus `PENDING_APPROVAL`.
+
+```http
+GET /api/approvals/purchase-orders
+Authorization: Bearer <JWT_TOKEN_MANAGEMENT>
+```
+
+##### Response `200 OK`:
+```json
+[
+  {
+    "purchaseOrderId": 12,
+    "poNumber": "PO-20260621-0001",
+    "supplierName": "Supplier Kopi Jaya",
+    "orderDate": "2026-06-21",
+    "status": "PENDING_APPROVAL",
+    "requestedBy": "gudang_budi",
+    "submittedAt": "2026-06-21T15:00:00",
+    "itemCount": 3,
+    "totalAmount": 1500000.00,
+    "notes": "Pengadaan stok bulanan Arabica dan Robusta",
+    "rejectionReason": null
+  }
+]
+```
+
+#### 2. Setujui Purchase Order
+Menyetujui Purchase Order. Status PO akan berubah menjadi `APPROVED`. Setelah disetujui, stok bahan baku belum bertambah sebelum staf gudang memicu proses penerimaan barang (`receive`).
+
+```http
+POST /api/approvals/purchase-orders/{id}/approve
+Authorization: Bearer <JWT_TOKEN_MANAGEMENT>
+```
+
+##### Response `200 OK`:
+```json
+{
+  "purchaseOrderId": 12,
+  "poNumber": "PO-20260621-0001",
+  "supplierName": "Supplier Kopi Jaya",
+  "orderDate": "2026-06-21",
+  "status": "APPROVED",
+  "requestedBy": "gudang_budi",
+  "submittedAt": "2026-06-21T15:00:00",
+  "itemCount": 3,
+  "totalAmount": 1500000.00,
+  "notes": "Pengadaan stok bulanan Arabica dan Robusta",
+  "rejectionReason": null
+}
+```
+
+#### 3. Tolak Purchase Order
+Menolak Purchase Order. Status PO akan kembali menjadi `REJECTED`. Alasan penolakan (`reason` atau `rejectReason`) wajib diisi pada request body.
+
+```http
+POST /api/approvals/purchase-orders/{id}/reject
+Authorization: Bearer <JWT_TOKEN_MANAGEMENT>
+Content-Type: application/json
+```
+
+##### Request Body:
+```json
+{
+  "reason": "Harga satuan Arabica Bean tidak sesuai dengan kontrak terbaru."
+}
+```
+*(Catatan: Backend menerima parameter `reason` atau `rejectReason` secara fleksibel).*
+
+##### Response `200 OK`:
+```json
+{
+  "purchaseOrderId": 12,
+  "poNumber": "PO-20260621-0001",
+  "supplierName": "Supplier Kopi Jaya",
+  "orderDate": "2026-06-21",
+  "status": "REJECTED",
+  "requestedBy": "gudang_budi",
+  "submittedAt": "2026-06-21T15:00:00",
+  "itemCount": 3,
+  "totalAmount": 1500000.00,
+  "notes": "Pengadaan stok bulanan Arabica dan Robusta",
+  "rejectionReason": "Harga satuan Arabica Bean tidak sesuai dengan kontrak terbaru."
+}
 ```
 
 ---
@@ -819,3 +920,116 @@ let waURL = "https://wa.me/\(phoneNumber)?text=\(messageText.addingPercentEncodi
 * **Movement Types**: `SALE_CONSUMPTION`, `PURCHASE_RECEIVE`, `STOCK_REQUEST_COMPLETED`, `MANUAL_ADJUSTMENT`, `VOID_REVERSAL`.
 * **Quantity**: Bertanda negatif (`-`) untuk pengurangan stok dan positif (`+`) untuk penambahan stok.
 
+---
+
+## 12. Dashboard Endpoints (Hanya MANAGEMENT)
+
+Menyediakan data analisis eksekutif secara berkala untuk keperluan visualisasi grafik dan performa bisnis di dashboard administrator.
+
+### 1. Metrik Ringkasan Dashboard (Executive Overview)
+Mendapatkan semua indikator performa utama (KPI), grafik penjualan 7 hari terakhir, kategori terlaris, produk terlaris, mutasi stok terbaru, transaksi terbaru, dan bahan baku dengan stok kritis.
+
+```http
+GET /api/dashboard
+Authorization: Bearer <JWT_TOKEN_MANAGEMENT>
+```
+
+#### Response `200 OK`:
+```json
+{
+  "generatedAt": "2026-06-21T22:45:00",
+  "todaySales": 2500000.0,
+  "salesChangePercentage": 12.5,
+  "todayTransactions": 42,
+  "transactionChangePercentage": 5.0,
+  "criticalStockCount": 3,
+  "pendingApprovalCount": 5,
+  "activeUsers": 8,
+  "totalProducts": 24,
+  "totalIngredients": 45,
+  "totalSuppliers": 10,
+  "totalTransactions": 1240,
+  "totalSales": 34500000.0,
+  "totalStockMovements": 182,
+  "topSellingProducts": [
+    {
+      "productName": "Matcha Latte",
+      "quantitySold": 150,
+      "revenue": 3750000.0
+    }
+  ],
+  "recentStockMovements": [
+    {
+      "ingredientName": "Fresh Milk",
+      "movementType": "SALE_CONSUMPTION",
+      "quantity": -150.0,
+      "referenceNumber": "TRX-1781626216791",
+      "movementDate": "2026-06-21T22:10:00"
+    }
+  ],
+  "recentTransactions": [
+    {
+      "transactionNumber": "TRX-1781626216791",
+      "cashierName": "Jane Kasir",
+      "totalAmount": 25000.0,
+      "paymentMethod": "CASH",
+      "createdAt": "2026-06-21T22:10:00"
+    }
+  ],
+  "topMovingIngredients": [
+    {
+      "ingredientName": "Arabica Coffee Bean",
+      "totalQuantity": 5000.0
+    }
+  ],
+  "lastSevenDays": [
+    {
+      "date": "2026-06-21",
+      "sales": 2500000.0,
+      "transactions": 42
+    }
+  ],
+  "salesByCategory": [
+    {
+      "categoryName": "Non-Kopi",
+      "revenue": 1500000.0,
+      "itemCount": 60
+    }
+  ],
+  "criticalStocks": [
+    {
+      "ingredientName": "Susu UHT",
+      "currentStock": 2.0,
+      "minimumStock": 5.0,
+      "unit": "liter"
+    }
+  ]
+}
+```
+
+### 2. Daftar Produk Terlaris (Top Selling Products)
+Mendapatkan daftar produk dengan volume penjualan tertinggi.
+
+```http
+GET /api/dashboard/best-products?limit=5
+Authorization: Bearer <JWT_TOKEN_MANAGEMENT>
+```
+
+* **Query Parameter**:
+  * `limit` (Integer, Opsional, default = `5`): Membatasi jumlah produk terlaris yang dikembalikan.
+
+#### Response `200 OK`:
+```json
+[
+  {
+    "productName": "Matcha Latte",
+    "quantitySold": 150,
+    "revenue": 3750000.0
+  },
+  {
+    "productName": "Espresso Double",
+    "quantitySold": 120,
+    "revenue": 2400000.0
+  }
+]
+```
